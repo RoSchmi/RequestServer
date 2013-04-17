@@ -7,7 +7,7 @@ file(GLOB game_headers *.h)
 
 add_library(GameServer SHARED ${game_sources})
 
-set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -pedantic -Wno-overloaded-virtual ${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "-std=c++11 -flto -Wall -pedantic -Wno-overloaded-virtual ${CMAKE_CXX_FLAGS}")
 
 find_package(Threads REQUIRED)
 find_package(PostgreSQL REQUIRED)
@@ -22,6 +22,6 @@ include_directories(${PostgreSQL_INCLUDE_DIRS})
 
 if(NOT WIN32)
 	target_link_libraries(GameServer rt)
-	install(FILES ${game_headers} DESTINATION include/GameServer)
+	install(FILES ${game_headers} DESTINATION "include/Game Server")
 	install(FILES ${CMAKE_BINARY_DIR}/libGameServer.so DESTINATION lib)
 endif()
