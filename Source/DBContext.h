@@ -17,13 +17,13 @@ namespace GameServer {
 		IDBContext& operator=(IDBContext&& other);
 
 		public:
-			IDBContext(const Utilities::SQLDatabase::Connection::Parameters& connectionParameters);
-			virtual ~IDBContext();
+			exported IDBContext(const Utilities::SQLDatabase::Connection::Parameters& connectionParameters);
+			exported virtual ~IDBContext();
 
-			void beginTransaction();
-			void rollbackTransaction();
-			void commitTransaction();
-			uint64 getNewId();
+			exported void beginTransaction();
+			exported void rollbackTransaction();
+			exported void commitTransaction();
+			exported uint64 getNewId();
 			
 			Utilities::SQLDatabase::Connection connection;
 	};
