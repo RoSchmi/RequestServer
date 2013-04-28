@@ -37,8 +37,8 @@ namespace GameServer {
 		exported ICachedCollection(const Utilities::SQLDatabase::Connection& contextConnection, ICacheProvider& contextCache, std::string tableName) : IDBCollection<T>(contextConnection, tableName), cache(contextCache) { }
 		exported virtual ~ICachedCollection() { };
 
-		exported void load(uint64 planetId) {
-			for (auto i : this->tableBinding.executeSelectManyByField(this->dbConnection, "PlanetId", planetId))
+		template<typename U> exported void load(std::string fieldName, U fieldValue) {
+			for (auto i : this->tableBinding.executeSelectManyByField(this->dbConnection, fieldName, fieldValue))
 				this->cache.add(new T(i));
 		}
 
