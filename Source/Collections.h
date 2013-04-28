@@ -46,8 +46,8 @@ namespace GameServer {
 			return dynamic_cast<T*>(this->cache.getById(id));
 		}
 
-		exported T* getByLocation(GameServer::Objects::Location location) {
-			return dynamic_cast<T*>(this->cache.getByLocation(location));
+		exported T* getByLocation(float64 x, float64 y) {
+			return dynamic_cast<T*>(this->cache.getByLocation(x, y));
 		}
 
 		exported void insert(T& object) {

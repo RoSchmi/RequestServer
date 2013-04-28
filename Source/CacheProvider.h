@@ -9,7 +9,10 @@
 
 namespace GameServer {
 	class ICacheProvider {
-		GameServer::Objects::Size size;
+		float64 startX;
+		float64 startY;
+		uint32 width;
+		uint32 height;
 
 		std::map<uint64, std::map<uint64, GameServer::Objects::IObject*>> ownerIndex;
 		std::map<uint64, GameServer::Objects::IObject*> idIndex;
@@ -21,21 +24,24 @@ namespace GameServer {
 		ICacheProvider& operator=(ICacheProvider&& other);
 		
 		public: 
-			exported ICacheProvider(GameServer::Objects::Size size);
+			exported ICacheProvider(float64 startX, float64 startY, uint32 width, uint32 height);
 			exported virtual ~ICacheProvider();
 			 
 			exported void remove(GameServer::Objects::IObject* object);
 			exported void remove(GameServer::Objects::IMap* object);
 			exported void add(GameServer::Objects::IObject* object);
 			exported void add(GameServer::Objects::IMap* object);
+
+			exported void moveTo(GameServer::Objects::IMap* object, float64 x, float64 y);
+			exported GameServer::Objects::IMap*& getByLocation(float64 x, float64 y);
 			 
 			exported GameServer::Objects::IObject* getById(uint64 searchId);
 			 
-			exported std::map<uint64, GameServer::Objects::IMap*> getInArea(GameServer::Objects::Location location, GameServer::Objects::Size size);
-			exported bool isAreaEmpty(GameServer::Objects::Location location, GameServer::Objects::Size size);
-			exported GameServer::Objects::IMap* getByLocation(GameServer::Objects::Location searchLocation);
-			exported GameServer::Objects::IMap* getByLocation(float64 x, float64 y);
-			exported bool isLocationInLOS(GameServer::Objects::Location location, uint64 ownerId, uint32 radius);
+			exported std::map<uint64, GameServer::Objects::IMap*> getInArea(float64 x, float64 y, uint32 width, uint32 height);
+			exported bool isAreaEmpty(float64 x, float64 y, uint32 width, uint32 height);
+			exported bool isLocationInLOS(float64 x, float64 y, uint64 ownerId, uint32 radius);
+			exported bool isLocationInBounds(float64 x, float64 y);
+			exported bool isLocationInBounds(float64 x, float64 y, uint32 width, uint32 height);
 			 
 			exported std::map<uint64, GameServer::Objects::IObject*> getByOwner(uint64 ownerId);
 			exported std::map<uint64, GameServer::Objects::IMap*> getInOwnerLOS(uint64 ownerId, uint32 radius);
