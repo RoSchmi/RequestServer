@@ -19,14 +19,9 @@ namespace GameServer {
 		ICacheProvider(ICacheProvider&& other);
 		ICacheProvider& operator=(const ICacheProvider& other);
 		ICacheProvider& operator=(ICacheProvider&& other);
-
-		uint64 locationToOffset(GameServer::Objects::Location location);
-		uint64 locationToOffset(float64 x, float64 y);
-		uint64 locationToOffsetInt(uint64 x, uint64 y);
-		GameServer::Objects::IMap* getAtLocation(uint64 offset);
-
+		
 		public: 
-			exported ICacheProvider(GameServer::Objects::Size size, const Utilities::SQLDatabase::Connection& connection);
+			exported ICacheProvider(GameServer::Objects::Size size);
 			exported virtual ~ICacheProvider();
 			 
 			exported void remove(GameServer::Objects::IObject* object);
@@ -39,7 +34,6 @@ namespace GameServer {
 			exported std::map<uint64, GameServer::Objects::IMap*> getInArea(GameServer::Objects::Location location, GameServer::Objects::Size size);
 			exported bool isAreaEmpty(GameServer::Objects::Location location, GameServer::Objects::Size size);
 			exported GameServer::Objects::IMap* getByLocation(GameServer::Objects::Location searchLocation);
-			exported GameServer::Objects::IMap* getByLocationInt(uint64 x, uint64 y);
 			exported GameServer::Objects::IMap* getByLocation(float64 x, float64 y);
 			exported bool isLocationInLOS(GameServer::Objects::Location location, uint64 ownerId, uint32 radius);
 			 
