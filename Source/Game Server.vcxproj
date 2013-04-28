@@ -1,10 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <PropertyGroup Label="UserMacros">
-  	<RootDir>$(SolutionDir)..\..</RootDir>
-  	<DeployHeaders>true</DeployHeaders>
-  </PropertyGroup>
-  <Import Project="$(RootDir)\Dependencies\C Library.props" />
+  <Import Project="$(SolutionDir)..\..\Dependencies\C Library.props" />
   <PropertyGroup Label="Globals">
     <ProjectGuid>{8CC8633E-8BE3-4ED9-9E1D-6813516C8039}</ProjectGuid>
   </PropertyGroup>
