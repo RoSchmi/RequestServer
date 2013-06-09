@@ -106,7 +106,7 @@ bool ICacheProvider::isLocationInLOS(float64 x, float64 y, uint64 ownerId, uint3
 	y -= radius;
 
 	for (; x <= endX; x++) {
-		for (y = endY - radius; y <= endY; y++) {
+		for (y = endY - radius * 2; y <= endY; y++) {
 			IMap* current = this->getByLocation(x, y);
 			if (current && current->ownerId == ownerId) {
 				return true;
