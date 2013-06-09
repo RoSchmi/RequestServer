@@ -102,6 +102,8 @@ bool ICacheProvider::isAreaEmpty(float64 x, float64 y, uint32 width, uint32 heig
 bool ICacheProvider::isLocationInLOS(float64 x, float64 y, uint64 ownerId, uint32 radius) {
 	float64 endX = x + radius;
 	float64 endY = y + radius;
+	x -= radius;
+	y -= radius;
 
 	for (; x <= endX; x++) {
 		for (y = endY - radius; y <= endY; y++) {
