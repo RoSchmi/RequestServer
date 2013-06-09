@@ -33,8 +33,8 @@ void ICacheProvider::remove(IObject* object) {
 void ICacheProvider::remove(IMap* object) {
 	this->remove(static_cast<IObject*>(object));
 
-	for (float64 x = object->x; x <= object->x + object->width; x++)
-		for (float64 y = object->y; y <= object->y + object->height; y++)
+	for (float64 x = object->x; x < object->x + object->width; x++)
+		for (float64 y = object->y; y < object->y + object->height; y++)
 			this->getByLocation(x, y) = nullptr;
 }
 
@@ -46,18 +46,18 @@ void ICacheProvider::add(IObject* object) {
 void ICacheProvider::add(IMap* object) {
 	this->add(static_cast<IObject*>(object));
 
-	for (float64 x = object->x; x <= object->x + object->width; x++)
-		for (float64 y = object->y; y <= object->y + object->height; y++)
+	for (float64 x = object->x; x < object->x + object->width; x++)
+		for (float64 y = object->y; y < object->y + object->height; y++)
 			this->getByLocation(x, y) = object;
 }
 
 void ICacheProvider::moveTo(IMap* object, float64 x, float64 y) {
-	for (float64 oldX = object->x; oldX <= object->x + object->width; oldX++)
-		for (float64 oldY = object->y; oldY <= object->y + object->height; oldY++)
+	for (float64 oldX = object->x; oldX < object->x + object->width; oldX++)
+		for (float64 oldY = object->y; oldY < object->y + object->height; oldY++)
 			this->getByLocation(oldX, oldY) = nullptr;
 
-	for (float64 newX = x; newX <= x + object->width; newX++)
-		for (float64 newY = y; newY <= y + object->height; newY++)
+	for (float64 newX = x; newX < x + object->width; newX++)
+		for (float64 newY = y; newY < y + object->height; newY++)
 			this->getByLocation(newX, newY) = object;
 }
 
@@ -66,17 +66,16 @@ IObject* ICacheProvider::getById(uint64 searchId) {
 }
 
 IMap*& ICacheProvider::getByLocation(float64 x, float64 y) {
-	if (!this->isLocationInBounds(x, y))
-		throw runtime_error("Out of bounds.");
-
 	return this->locationIndex[this->width * static_cast<uint64>(y - this->startY) + static_cast<uint64>(x - this->startX)];
 }
 
 map<uint64, IMap*> ICacheProvider::getInArea(float64 x, float64 y, uint32 width, uint32 height) {
 	map<uint64, IMap*> result; //we use a map to make it easy for large objects to only be added once
+	float64 endX = x + width;
+	float64 endY = y + height;
 				
-	for (x += width; width > 0; x--, width--) {
-		for (y += height; height > 0; y--, height--) {
+	for (; x < endX; x++) {
+		for (y = endY - height; y < endY; y++) {
 			IMap* current = this->getByLocation(x, y);
 			if (current) {
 				result[current->id] = current;
@@ -91,9 +90,9 @@ bool ICacheProvider::isAreaEmpty(float64 x, float64 y, uint32 width, uint32 heig
 	float64 endX = x + width;
 	float64 endY = y + height;
 	
-	for (; x <= endX; x++)
-		for (y = endY - height; y <= endY; y++)
-			if (this->getByLocation(endX, endY))
+	for (; x < endX; x++)
+		for (y = endY - height; y < endY; y++)
+			if (this->getByLocation(x, y))
 				return false;
 
 	return true;
@@ -105,8 +104,8 @@ bool ICacheProvider::isLocationInLOS(float64 x, float64 y, uint64 ownerId, uint3
 	x -= radius;
 	y -= radius;
 
-	for (; x <= endX; x++) {
-		for (y = endY - radius * 2; y <= endY; y++) {
+	for (; x < endX; x++) {
+		for (y = endY - radius * 2; y < endY; y++) {
 			IMap* current = this->getByLocation(x, y);
 			if (current && current->ownerId == ownerId) {
 				return true;
@@ -118,11 +117,11 @@ bool ICacheProvider::isLocationInLOS(float64 x, float64 y, uint64 ownerId, uint3
 }
 
 bool ICacheProvider::isLocationInBounds(float64 x, float64 y) {
-	return x >= this->startX && y >= this->startY && x <= this->startX + this->width && y <= this->startY + this->height;
+	return x >= this->startX && y >= this->startY && x < this->startX + this->width && y < this->startY + this->height;
 }
 
 bool ICacheProvider::isLocationInBounds(float64 x, float64 y, uint32 width, uint32 height) {
-	return x >= this->startX && y >= this->startY && x + width <= this->startX + this->width && y + height <= this->startY + this->height;
+	return x >= this->startX && y >= this->startY && x + width < this->startX + this->width && y + height < this->startY + this->height;
 }
 
 map<uint64, IObject*> ICacheProvider::getByOwner(uint64 ownerId) {
@@ -140,8 +139,8 @@ map<uint64, IMap*> ICacheProvider::getInOwnerLOS(uint64 ownerId, uint32 radius) 
 		if (!currentOwnerObject) 
 			continue;
 
-		for (x = currentOwnerObject->x >= radius ? currentOwnerObject->x - radius : 0; x <= currentOwnerObject->x + radius; ++x) {
-			for (y = currentOwnerObject->y >= radius ? currentOwnerObject->y - radius : 0; y <= currentOwnerObject->y + radius; ++y) {
+		for (x = currentOwnerObject->x >= radius ? currentOwnerObject->x - radius : 0; x < currentOwnerObject->x + radius; ++x) {
+			for (y = currentOwnerObject->y >= radius ? currentOwnerObject->y - radius : 0; y < currentOwnerObject->y + radius; ++y) {
 				IMap* currentTestObject = this->getByLocation(x, y);
 				if (currentTestObject) {
 					result[currentTestObject->id] = currentTestObject;
