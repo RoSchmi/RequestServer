@@ -34,8 +34,8 @@ namespace GameServer {
 			exported void add(GameServer::Objects::IObject* object);
 			exported void add(GameServer::Objects::IMap* object);
 			exported void updateLocation(GameServer::Objects::IMap* object, float64 newX, float64 newY);
+			exported void clampToDimensions(float64& startX, float64& startY, float64& endX, float64& endY);
 
-			exported void moveTo(GameServer::Objects::IMap* object, float64 x, float64 y);
 			exported GameServer::Objects::IMap*& getByLocation(float64 x, float64 y);
 			 
 			exported GameServer::Objects::IObject* getById(uint64 searchId);
