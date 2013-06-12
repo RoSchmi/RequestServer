@@ -40,7 +40,7 @@ namespace GameServer {
 			 
 			exported GameServer::Objects::IObject* getById(uint64 searchId);
 			 
-			exported std::map<uint64, GameServer::Objects::IMap*> getInArea(float64 x, float64 y, uint32 width, uint32 height);
+			exported std::map<uint64, GameServer::Objects::IMap*> getInArea(float64 x, float64 y, uint32 width = 1, uint32 height = 1);
 			exported bool isAreaEmpty(float64 x, float64 y, uint32 width = 1, uint32 height = 1);
 			exported bool isLocationInLOS(float64 x, float64 y, uint64 ownerId, uint32 radius);
 			exported bool isLocationInBounds(float64 x, float64 y, uint32 width = 1, uint32 height = 1);
