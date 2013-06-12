@@ -12,6 +12,8 @@ using namespace std;
 ICacheProvider::ICacheProvider(float64 startX, float64 startY, uint32 width, uint32 height) {
 	this->startX = startX;
 	this->startY = startY;
+	this->endX = startX + width;
+	this->endY = startY + height;
 	this->width = width;
 	this->height = height;
 	this->locationIndex = new IMap*[width * height];
@@ -45,6 +47,19 @@ void ICacheProvider::add(IObject* object) {
 
 void ICacheProvider::add(IMap* object) {
 	this->add(static_cast<IObject*>(object));
+
+	for (float64 x = object->x; x < object->x + object->width; x++)
+		for (float64 y = object->y; y < object->y + object->height; y++)
+			this->getByLocation(x, y) = object;
+}
+
+void ICacheProvider::updateLocation(IMap* object, float64 newX, float64 newY) {
+	for (float64 x = object->x; x < object->x + object->width; x++)
+		for (float64 y = object->y; y < object->y + object->height; y++)
+			this->getByLocation(x, y) = nullptr;
+
+	object->x = newX;
+	object->y = newY;
 
 	for (float64 x = object->x; x < object->x + object->width; x++)
 		for (float64 y = object->y; y < object->y + object->height; y++)
@@ -116,12 +131,8 @@ bool ICacheProvider::isLocationInLOS(float64 x, float64 y, uint64 ownerId, uint3
 	return false;
 }
 
-bool ICacheProvider::isLocationInBounds(float64 x, float64 y) {
-	return x >= this->startX && y >= this->startY && x < this->startX + this->width && y < this->startY + this->height;
-}
-
 bool ICacheProvider::isLocationInBounds(float64 x, float64 y, uint32 width, uint32 height) {
-	return x >= this->startX && y >= this->startY && x + width < this->startX + this->width && y + height < this->startY + this->height;
+	return x >= this->startX && y >= this->startY && x + width <= this->endX && y + height <= this->endY;
 }
 
 map<uint64, IObject*> ICacheProvider::getByOwner(uint64 ownerId) {

@@ -50,9 +50,14 @@ namespace GameServer {
 			return dynamic_cast<T*>(this->cache.getByLocation(x, y));
 		}
 
-		exported void insert(T& object) {
-			IDBCollection<T>::insert(object);
-			this->cache.add(new T(object));
+		exported void updateLocation(T* object, float64 newX, float64 newY) {
+			IDBCollection<T>::update(*object);
+			this->cache.updateLocation(object, newX, newY);
+		}
+
+		exported void insert(T* object) {
+			IDBCollection<T>::insert(*object);
+			this->cache.add(object);
 		}
 
 		exported void remove(T* object) {
