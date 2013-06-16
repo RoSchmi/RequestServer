@@ -1,15 +1,19 @@
 #pragma once
 
-#include <Utilities/Common.h>
-#include <Utilities/SQLDatabase.h>
-#include <Utilities/RequestServer.h>
-#include <libconfig.h++>
 #include <iostream>
 #include <cstring>
 #include <string>
 
+#include <libconfig.h++>
+
+#include <Utilities/Common.h>
+#include <Utilities/SQLDatabase.h>
+#include <Utilities/RequestServer.h>
+
 #include "BaseRequest.h"
 #include "DBContext.h"
+
+#include "Common.h"
 
 namespace GameServer {
 	template<typename T> class NodeInstance {
@@ -69,7 +73,7 @@ namespace GameServer {
 
 			static bool onRequest(uint8 workerNumber, Utilities::RequestServer::Client& client, uint8 requestCategory, uint8 requestMethod, Utilities::DataStream& parameters, Utilities::DataStream& response, void* state) {
 				NodeInstance& node = *static_cast<NodeInstance*>(state);
-				uint16 resultCode = IResultCode::SUCCESS;
+				ResultCode resultCode = IResultCode::SUCCESS;
 				T& context = *node.dbConnections[workerNumber];
 
 				auto handler = node.handlerCreator(requestCategory, requestMethod, client.authenticatedId, resultCode);
@@ -95,7 +99,7 @@ namespace GameServer {
 					resultCode = IResultCode::SERVER_ERROR;
 				}
 
-				response.write<uint16>(static_cast<uint16>(resultCode));
+				response.write<ResultCode>(static_cast<ResultCode>(resultCode));
 				if (resultCode == IResultCode::SUCCESS)
 					handler->serialize(response);
 

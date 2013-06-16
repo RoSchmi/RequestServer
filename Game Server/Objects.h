@@ -1,9 +1,12 @@
 #pragma once
 
 #include <string>
+
 #include <Utilities/Time.h>
 #include <Utilities/Array.h>
 #include <Utilities/SQLDatabase.h>
+
+#include "Common.h"
 
 namespace GameServer {
 	namespace Objects {
@@ -11,7 +14,7 @@ namespace GameServer {
 			exported IObject(uint8 objectType);
 			exported virtual ~IObject();
 
-			uint64 ownerId;
+			OwnerId ownerId;
 			uint8 objectType;
 		};
 
@@ -19,12 +22,12 @@ namespace GameServer {
 			exported IMap(uint8 objectType);
 			exported virtual ~IMap();
 			
-			uint64 planetId;
-			float64 x;
-			float64 y;
+			ObjectId planetId;
+			Coordinate x;
+			Coordinate y;
 
-			uint32 width;
-			uint32 height;
+			Size width;
+			Size height;
 		};
 	}
 }

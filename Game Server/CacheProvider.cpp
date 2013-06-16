@@ -1,15 +1,15 @@
+#include "CacheProvider.h"
+
 #include <algorithm>
 #include <cstring>
 #include <exception>
 
-#include "CacheProvider.h"
-
-using namespace Utilities::SQLDatabase;
-using namespace GameServer::Objects;
-using namespace GameServer;
 using namespace std;
+using namespace Utilities::SQLDatabase;
+using namespace GameServer;
+using namespace GameServer::Objects;
 
-ICacheProvider::ICacheProvider(float64 startX, float64 startY, uint32 width, uint32 height) {
+ICacheProvider::ICacheProvider(Coordinate startX, Coordinate startY, Size width, Size height) {
 	this->startX = startX;
 	this->startY = startY;
 	this->endX = startX + width;
@@ -35,8 +35,8 @@ void ICacheProvider::remove(IObject* object) {
 void ICacheProvider::remove(IMap* object) {
 	this->remove(static_cast<IObject*>(object));
 
-	for (float64 x = object->x; x < object->x + object->width; x++)
-		for (float64 y = object->y; y < object->y + object->height; y++)
+	for (Coordinate x = object->x; x < object->x + object->width; x++)
+		for (Coordinate y = object->y; y < object->y + object->height; y++)
 			this->getByLocation(x, y) = nullptr;
 }
 
@@ -48,43 +48,43 @@ void ICacheProvider::add(IObject* object) {
 void ICacheProvider::add(IMap* object) {
 	this->add(static_cast<IObject*>(object));
 
-	for (float64 x = object->x; x < object->x + object->width; x++)
-		for (float64 y = object->y; y < object->y + object->height; y++)
+	for (Coordinate x = object->x; x < object->x + object->width; x++)
+		for (Coordinate y = object->y; y < object->y + object->height; y++)
 			this->getByLocation(x, y) = object;
 }
 
-void ICacheProvider::updateLocation(IMap* object, float64 newX, float64 newY) {
-	for (float64 x = object->x; x < object->x + object->width; x++)
-		for (float64 y = object->y; y < object->y + object->height; y++)
+void ICacheProvider::updateLocation(IMap* object, Coordinate newX, Coordinate newY) {
+	for (Coordinate x = object->x; x < object->x + object->width; x++)
+		for (Coordinate y = object->y; y < object->y + object->height; y++)
 			this->getByLocation(x, y) = nullptr;
 
 	object->x = newX;
 	object->y = newY;
 
-	for (float64 x = object->x; x < object->x + object->width; x++)
-		for (float64 y = object->y; y < object->y + object->height; y++)
+	for (Coordinate x = object->x; x < object->x + object->width; x++)
+		for (Coordinate y = object->y; y < object->y + object->height; y++)
 			this->getByLocation(x, y) = object;
 }
 
-void ICacheProvider::clampToDimensions(float64& startX, float64& startY, float64& endX, float64& endY) {
+void ICacheProvider::clampToDimensions(Coordinate& startX, Coordinate& startY, Coordinate& endX, Coordinate& endY) {
 	if (startX < this->startX) startX = this->startX;
 	if (startY < this->startY) startY = this->startY;
 	if (endX >= this->endX) endX = this->endX - 1;
 	if (endY >= this->endY) endY = this->endY - 1;
 }
 
-IObject* ICacheProvider::getById(uint64 searchId) {
+IObject* ICacheProvider::getById(ObjectId searchId) {
 	return this->idIndex[searchId];
 }
 
-IMap*& ICacheProvider::getByLocation(float64 x, float64 y) {
-	return this->locationIndex[this->width * static_cast<uint64>(y - this->startY) + static_cast<uint64>(x - this->startX)];
+IMap*& ICacheProvider::getByLocation(Coordinate x, Coordinate y) {
+	return this->locationIndex[this->width * static_cast<ObjectId>(y - this->startY) + static_cast<ObjectId>(x - this->startX)];
 }
 
-map<uint64, IMap*> ICacheProvider::getInArea(float64 x, float64 y, uint32 width, uint32 height) {
-	map<uint64, IMap*> result; //we use a map to make it easy for large objects to only be added once
-	float64 endX = x + width;
-	float64 endY = y + height;
+map<ObjectId, IMap*> ICacheProvider::getInArea(Coordinate x, Coordinate y, Size width, Size height) {
+	map<ObjectId, IMap*> result; //we use a map to make it easy for large objects to only be added once
+	Coordinate endX = x + width;
+	Coordinate endY = y + height;
 
 	this->clampToDimensions(x, y, endX, endY);
 				
@@ -100,9 +100,9 @@ map<uint64, IMap*> ICacheProvider::getInArea(float64 x, float64 y, uint32 width,
 	return result;
 }
 
-bool ICacheProvider::isAreaEmpty(float64 x, float64 y, uint32 width, uint32 height) {
-	float64 endX = x + width;
-	float64 endY = y + height;
+bool ICacheProvider::isAreaEmpty(Coordinate x, Coordinate y, Size width, Size height) {
+	Coordinate endX = x + width;
+	Coordinate endY = y + height;
 
 	this->clampToDimensions(x, y, endX, endY);
 	
@@ -114,11 +114,11 @@ bool ICacheProvider::isAreaEmpty(float64 x, float64 y, uint32 width, uint32 heig
 	return true;
 }
 
-bool ICacheProvider::isLocationInLOS(float64 x, float64 y, uint64 ownerId, uint32 radius) {
-	float64 endX = x + radius;
-	float64 endY = y + radius;
-	float64 startX = x - radius;
-	float64 startY = y - radius;
+bool ICacheProvider::isLocationInLOS(Coordinate x, Coordinate y, OwnerId ownerId, Size radius) {
+	Coordinate endX = x + radius;
+	Coordinate endY = y + radius;
+	Coordinate startX = x - radius;
+	Coordinate startY = y - radius;
 
 	this->clampToDimensions(startX, startY, endX, endY);
 
@@ -134,19 +134,19 @@ bool ICacheProvider::isLocationInLOS(float64 x, float64 y, uint64 ownerId, uint3
 	return false;
 }
 
-bool ICacheProvider::isLocationInBounds(float64 x, float64 y, uint32 width, uint32 height) {
+bool ICacheProvider::isLocationInBounds(Coordinate x, Coordinate y, Size width, Size height) {
 	return x >= this->startX && y >= this->startY && x + width <= this->endX && y + height <= this->endY;
 }
 
-map<uint64, IObject*> ICacheProvider::getByOwner(uint64 ownerId) {
+map<OwnerId, IObject*> ICacheProvider::getByOwner(OwnerId ownerId) {
 	return this->ownerIndex[ownerId];
 }
 
-map<uint64, IMap*> ICacheProvider::getInOwnerLOS(uint64 ownerId, uint32 radius) {
-	map<uint64, IObject*> ownerObjects = this->ownerIndex[ownerId];
+map<OwnerId, IMap*> ICacheProvider::getInOwnerLOS(OwnerId ownerId, Size radius) {
+	map<OwnerId, IObject*> ownerObjects = this->ownerIndex[ownerId];
 	
-	float64 startX, startY, endX, endY, x, y;
-	map<uint64, IMap*> result;
+	Coordinate startX, startY, endX, endY, x, y;
+	map<OwnerId, IMap*> result;
 	for (auto i : ownerObjects) {
 		IMap* currentOwnerObject = dynamic_cast<IMap*>(i.second);
 		if (!currentOwnerObject) 

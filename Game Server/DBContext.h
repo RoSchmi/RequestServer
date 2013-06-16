@@ -5,11 +5,13 @@
 #include "CacheProvider.h"
 #include "Collections.h"
 #include "Objects.h"
+#include "Common.h"
 
 namespace GameServer {
 	class IDBContext {
-		uint64 nextId;
-		uint64 endOfIssuedIdBlock;
+		ObjectId nextId;
+		ObjectId endOfIssuedIdBlock;
+		bool transactionCommitted;
 		
 		IDBContext(const IDBContext& other);
 		IDBContext(IDBContext&& other);
@@ -23,7 +25,8 @@ namespace GameServer {
 			exported void beginTransaction();
 			exported void rollbackTransaction();
 			exported void commitTransaction();
-			exported uint64 getNewId();
+			exported ObjectId getNewId();
+			exported bool wasTransactionCommitted() const;
 			
 			Utilities::SQLDatabase::Connection connection;
 	};

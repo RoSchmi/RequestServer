@@ -1,8 +1,8 @@
 #pragma once
 
-#include <Utilities/SQLDatabase.h>
-
 #include <string>
+
+#include <Utilities/SQLDatabase.h>
 
 #include "CacheProvider.h"
 #include "Objects.h"
@@ -12,7 +12,7 @@ namespace GameServer {
 		exported IDBCollection(const Utilities::SQLDatabase::Connection& contextConnection, std::string tableName) : dbConnection(contextConnection), tableBinding(tableName, true) { }
 		exported virtual ~IDBCollection() { };
 
-		exported T getById(uint64 id) {
+		exported T getById(ObjectId id) {
 			return this->tableBinding.executeSelectById(this->dbConnection, id);
 		}
 
@@ -42,17 +42,25 @@ namespace GameServer {
 				this->cache.add(new T(i));
 		}
 
-		exported T* getById(uint64 id) {
+		exported T* getById(ObjectId id) {
 			return dynamic_cast<T*>(this->cache.getById(id));
 		}
 
-		exported T* getByLocation(float64 x, float64 y) {
+		exported T* getByLocation(Coordinate x, Coordinate y) {
 			return dynamic_cast<T*>(this->cache.getByLocation(x, y));
 		}
 
-		exported void updateLocation(T* object, float64 newX, float64 newY) {
+		exported void updateLocation(T* object, Coordinate newX, Coordinate newY) {
 			IDBCollection<T>::update(*object);
 			this->cache.updateLocation(object, newX, newY);
+		}
+
+		exported void changePlanet(T* object, ObjectId newPlanetId) {
+			object->planetId = newPlanetId;
+			IDBCollection<T>::update(*object);
+			this->dbConnection.commitTransaction();
+			this->cache.remove(object);
+			delete object;
 		}
 
 		exported void insert(T* object) {
