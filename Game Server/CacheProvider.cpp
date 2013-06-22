@@ -138,24 +138,24 @@ bool ICacheProvider::isLocationInBounds(Coordinate x, Coordinate y, Size width, 
 	return x >= this->startX && y >= this->startY && x + width <= this->endX && y + height <= this->endY;
 }
 
-map<OwnerId, IObject*> ICacheProvider::getByOwner(OwnerId ownerId) {
+map<ObjectId, IObject*> ICacheProvider::getByOwner(OwnerId ownerId) {
 	return this->ownerIndex[ownerId];
 }
 
-map<OwnerId, IMap*> ICacheProvider::getInOwnerLOS(OwnerId ownerId, Size radius) {
-	map<OwnerId, IObject*> ownerObjects = this->ownerIndex[ownerId];
+map<ObjectId, IMap*> ICacheProvider::getInOwnerLOS(OwnerId ownerId, Size radius) {
+	map<ObjectId, IObject*> ownerObjects = this->ownerIndex[ownerId];
 	
 	Coordinate startX, startY, endX, endY, x, y;
-	map<OwnerId, IMap*> result;
+	map<ObjectId, IMap*> result;
 	for (auto i : ownerObjects) {
 		IMap* currentOwnerObject = dynamic_cast<IMap*>(i.second);
 		if (!currentOwnerObject) 
 			continue;
 
-		startX = currentOwnerObject->x;
-		startY = currentOwnerObject->y;
-		endX = startX + radius;
-		endY = startY + radius;
+		startX = currentOwnerObject->x - radius;
+		startY = currentOwnerObject->y - radius;
+		endX = currentOwnerObject->x + radius;
+		endY = currentOwnerObject->y + radius;
 
 		this->clampToDimensions(startX, startY, endX, endY);
 
@@ -168,6 +168,31 @@ map<OwnerId, IMap*> ICacheProvider::getInOwnerLOS(OwnerId ownerId, Size radius) 
 			}
 		}
 	}
+
+	return result;
+}
+
+std::vector<ObjectId> ICacheProvider::getUsersWithLOSAt(Coordinate x, Coordinate y, Size radius) {
+	map<ObjectId, ObjectId> resultMap; //we use a map to make it easy for large objects to only be added once
+	Coordinate endX = x + radius;
+	Coordinate endY = y + radius;
+	Coordinate startX = x - radius;
+	Coordinate startY = y - radius;
+
+	this->clampToDimensions(startX, startY, endX, endY);
+				
+	for (Coordinate thiX = startX; thiX < endX; thiX++) {
+		for (Coordinate thisY = startY; thisY < endY; thisY++) {
+			IMap* current = this->getByLocation(thiX, thisY);
+			if (current) {
+				resultMap[current->ownerId] = current->ownerId;
+			}
+		}
+	}
+
+	vector<ObjectId> result;
+	for (auto i : resultMap)
+		result.push_back(i.first);
 
 	return result;
 }

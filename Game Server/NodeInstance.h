@@ -10,13 +10,16 @@
 #include <Utilities/SQLDatabase.h>
 #include <Utilities/RequestServer.h>
 
-#include "BaseRequest.h"
+#include "BaseMessages.h"
 #include "DBContext.h"
 
 #include "Common.h"
 
 namespace GameServer {
 	template<typename T> class NodeInstance {
+		private:
+			Utilities::RequestServer* requestServer;
+
 		public:
 			libconfig::Config config;
 
@@ -32,6 +35,7 @@ namespace GameServer {
 				this->wsPort = string(settings["webSocketServerPort"].c_str());
 				this->handlerCreator = handlerCreator;
 				this->dbConnections = new T*[this->workers];
+				this->requestServer = nullptr;
 
 				const libconfig::Setting& dbSettings = settings["Database"];
 				Utilities::SQLDatabase::Connection::Parameters parameters = {dbSettings["host"].c_str(), dbSettings["port"].c_str(), dbSettings["dbname"].c_str(), dbSettings["role"].c_str(), dbSettings["password"].c_str()};
@@ -44,6 +48,9 @@ namespace GameServer {
 					delete this->dbConnections[i];
 
 				delete[] this->dbConnections;
+
+				if (this->requestServer)
+					delete this->requestServer;
 			}
 
 			exported void run() {
@@ -55,12 +62,16 @@ namespace GameServer {
 				flags.push_back(false);
 				flags.push_back(true);
 
-				Utilities::RequestServer requestServer(ports, this->workers, flags, IResultCode::RETRY_LATER, onRequest, this);
+				this->requestServer = new RequestServer(ports, this->workers, flags, IResultCode::RETRY_LATER, onRequest, this);
 
 				int8 input;
 				do {
 					cin >> input;
 				} while (input != 'c');
+			}
+
+			exported void sendNotification(ObjectId userId, uint64 connectionId, Utilities::DataStream& message) {
+				this->requestServer->send(userId, connectionId, message);
 			}
 
 
@@ -90,7 +101,7 @@ namespace GameServer {
 				}
 	
 				context.beginTransaction();
-				resultCode = handler->process(client.authenticatedId, client.ipAddress, context);
+				resultCode = handler->process(client.authenticatedId, client.id, client.ipAddress, context);
 				try {
 					context.commitTransaction();
 				} catch (const Utilities::SQLDatabase::Exception& e) {

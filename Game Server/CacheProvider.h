@@ -45,7 +45,9 @@ namespace GameServer {
 			exported bool isLocationInLOS(Coordinate x, Coordinate y, OwnerId ownerId, Size radius);
 			exported bool isLocationInBounds(Coordinate x, Coordinate y, Size width = 1, Size height = 1);
 			 
-			exported std::map<OwnerId, GameServer::Objects::IObject*> getByOwner(OwnerId ownerId);
-			exported std::map<OwnerId, GameServer::Objects::IMap*> getInOwnerLOS(OwnerId ownerId, Size radius);
+			exported std::map<ObjectId, GameServer::Objects::IObject*> getByOwner(OwnerId ownerId);
+			exported std::map<ObjectId, GameServer::Objects::IMap*> getInOwnerLOS(OwnerId ownerId, Size radius);
+			
+			exported std::vector<ObjectId> getUsersWithLOSAt(Coordinate x, Coordinate y, Size radius);
 	};
 }

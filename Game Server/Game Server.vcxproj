@@ -19,7 +19,7 @@
     <ClInclude Include="BrokerNode.h" />
     <ClInclude Include="Common.h" />
     <ClInclude Include="NodeInstance.h" />
-    <ClInclude Include="BaseRequest.h" />
+    <ClInclude Include="BaseMessages.h" />
     <ClInclude Include="Objects.h" />
     <ClInclude Include="Collections.h" />
     <ClInclude Include="CacheProvider.h" />

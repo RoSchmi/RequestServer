@@ -5,6 +5,7 @@
 #include <Utilities/Socket.h>
 #include <Utilities/Time.h>
 
+#include "Common.h"
 #include "Objects.h"
 #include "DBContext.h"
 
@@ -27,8 +28,8 @@ namespace GameServer {
 	
 	template<typename T> class BaseRequest {
 		public:
-			virtual ResultCode process(ObjectId& userId, const uint8 ipAddress[Utilities::Net::Socket::ADDRESS_LENGTH], T& db) = 0;
-			virtual void deserialize(Utilities::DataStream& parameters) = 0;
-			virtual void serialize(Utilities::DataStream& response) = 0;
+			exported virtual ResultCode process(ObjectId& userId, uint64 connectionId, const uint8 ipAddress[Utilities::Net::Socket::ADDRESS_LENGTH], T& db) = 0;
+			exported virtual void deserialize(Utilities::DataStream& parameters) = 0;
+			exported virtual void serialize(Utilities::DataStream& response) = 0;
 	};
 }
