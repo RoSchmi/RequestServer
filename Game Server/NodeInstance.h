@@ -3,6 +3,10 @@
 #include <iostream>
 #include <cstring>
 #include <string>
+#include <mutex>
+#include <map>
+#include <vector>
+#include <algorithm>
 
 #include <libconfig.h++>
 
@@ -54,7 +58,7 @@ namespace GameServer {
 			}
 
 			exported void run() {
-				std::vector<string> ports;
+				std::vector<std::string> ports;
 				ports.push_back(this->tcpPort);
 				ports.push_back(this->wsPort);
 
@@ -62,32 +66,71 @@ namespace GameServer {
 				flags.push_back(false);
 				flags.push_back(true);
 
-				this->requestServer = new RequestServer(ports, this->workers, flags, IResultCode::RETRY_LATER, onRequest, this);
+				this->requestServer = new Utilities::RequestServer(ports, this->workers, flags, IResultCode::RETRY_LATER, onRequest, onConnect, onDisconnect, this);
 
 				int8 input;
 				do {
-					cin >> input;
+					std::cin >> input;
 				} while (input != 'c');
 			}
 
-			exported void sendNotification(ObjectId userId, uint64 connectionId, Utilities::DataStream& message) {
-				this->requestServer->send(userId, connectionId, message);
+			exported Utilities::DataStream getNewNotification() {
+				return this->requestServer->getOutOfBandMessageStream();
+			}
+
+			exported void sendNotification(ObjectId receipientUserId, Utilities::DataStream& message) {
+				this->clientsLock.lock();
+
+				auto iter = this->authenticatedClients.find(receipientUserId);
+				if (iter != this->authenticatedClients.end())
+					for (auto i : iter->second)
+						this->requestServer->send(*i, message);
+
+				this->clientsLock.unlock();
 			}
 
 
 		private:
+			std::map<ObjectId, std::vector<Utilities::RequestServer::Client*>> authenticatedClients;
+			std::mutex clientsLock;
+
 			uint32 workers;
 			std::string tcpPort;
 			std::string wsPort;
 			HandlerCreator handlerCreator;
 			T** dbConnections;
 
+			static void* onConnect(Utilities::RequestServer::Client& client, void* state) {
+				return nullptr;
+			}
+
+			static void onDisconnect(Utilities::RequestServer::Client& client, void* state) {
+				NodeInstance& node = *static_cast<NodeInstance*>(state);
+				ObjectId authenticatedId = reinterpret_cast<ObjectId>(client.state);
+				
+				node.clientsLock.lock();
+
+				auto i = node.authenticatedClients.find(authenticatedId);
+				if (i != node.authenticatedClients.end()) {
+					auto& list = i->second;
+					auto j = std::find(list.begin(), list.end(), &client);
+					list.erase(j);
+
+					if (list.size() == 0)
+						node.authenticatedClients.erase(authenticatedId);
+				}
+
+				node.clientsLock.unlock();
+			}
+
 			static bool onRequest(uint8 workerNumber, Utilities::RequestServer::Client& client, uint8 requestCategory, uint8 requestMethod, Utilities::DataStream& parameters, Utilities::DataStream& response, void* state) {
 				NodeInstance& node = *static_cast<NodeInstance*>(state);
 				ResultCode resultCode = IResultCode::SUCCESS;
 				T& context = *node.dbConnections[workerNumber];
+				ObjectId authenticatedId = reinterpret_cast<ObjectId>(client.state);
+				ObjectId startId = authenticatedId;
 
-				auto handler = node.handlerCreator(requestCategory, requestMethod, client.authenticatedId, resultCode);
+				auto handler = node.handlerCreator(requestCategory, requestMethod, authenticatedId, resultCode);
 				if (resultCode != IResultCode::SUCCESS) {
 					response.write(resultCode);
 					return true;
@@ -101,7 +144,7 @@ namespace GameServer {
 				}
 	
 				context.beginTransaction();
-				resultCode = handler->process(client.authenticatedId, client.id, client.ipAddress, context);
+				resultCode = handler->process(authenticatedId, context);
 				try {
 					context.commitTransaction();
 				} catch (const Utilities::SQLDatabase::Exception& e) {
@@ -115,6 +158,14 @@ namespace GameServer {
 					handler->serialize(response);
 
 				delete handler;
+
+				//It is invalid to change the authenticated id more than once per session.
+				if (authenticatedId != startId) {
+					node.clientsLock.lock();
+					node.authenticatedClients[authenticatedId].push_back(&client);
+					node.clientsLock.unlock();
+					client.state = reinterpret_cast<void*>(authenticatedId);
+				}
 
 				return true;
 			}

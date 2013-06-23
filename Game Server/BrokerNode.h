@@ -19,9 +19,9 @@ namespace GameServer {
 		static void onRequestReceived(Utilities::Net::TCPConnection& connection, void* state, Utilities::Net::TCPConnection::Message& message);
 
 		public:
-			BrokerNode(cstr port);
-			~BrokerNode();
-
-			void run();
+			exported BrokerNode(cstr port);
+			exported ~BrokerNode();
+			 
+			exported void run();
 	};
 }
