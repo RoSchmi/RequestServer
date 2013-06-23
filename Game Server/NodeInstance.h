@@ -75,16 +75,21 @@ namespace GameServer {
 			}
 
 			exported Utilities::DataStream getNewNotification() {
-				return this->requestServer->getOutOfBandMessageStream();
+				Utilities::DataStream stream;
+				Utilities::RequestServer::Message::getHeader(stream, 0, 0, 0);
+				return stream;
 			}
 
-			exported void sendNotification(ObjectId receipientUserId, Utilities::DataStream& message) {
+			exported void sendNotification(ObjectId receipientUserId, Utilities::DataStream& stream) {
 				this->clientsLock.lock();
 
 				auto iter = this->authenticatedClients.find(receipientUserId);
-				if (iter != this->authenticatedClients.end())
-					for (auto i : iter->second)
-						this->requestServer->send(*i, message);
+				if (iter != this->authenticatedClients.end()) {
+					for (auto i : iter->second) {
+						auto message = new Utilities::RequestServer::Message(*i, stream);
+						this->requestServer->addToOutgoingQueue(message);
+					}
+				}
 
 				this->clientsLock.unlock();
 			}
@@ -123,38 +128,40 @@ namespace GameServer {
 				node.clientsLock.unlock();
 			}
 
-			static bool onRequest(uint8 workerNumber, Utilities::RequestServer::Client& client, uint8 requestCategory, uint8 requestMethod, Utilities::DataStream& parameters, Utilities::DataStream& response, void* state) {
+			static bool onRequest(uint8 workerNumber, Utilities::RequestServer::Client& client, uint8 requestCategory, uint8 requestMethod, Utilities::DataStream& parameters, Utilities::DataStream& response, uint16& resultCode, void* state) {
 				NodeInstance& node = *static_cast<NodeInstance*>(state);
-				ResultCode resultCode = IResultCode::SUCCESS;
+				ResultCode resultStatus = IResultCode::SUCCESS;
 				T& context = *node.dbConnections[workerNumber];
 				ObjectId authenticatedId = reinterpret_cast<ObjectId>(client.state);
 				ObjectId startId = authenticatedId;
 
-				auto handler = node.handlerCreator(requestCategory, requestMethod, authenticatedId, resultCode);
-				if (resultCode != IResultCode::SUCCESS) {
-					response.write(resultCode);
+				auto handler = node.handlerCreator(requestCategory, requestMethod, authenticatedId, resultStatus);
+				if (resultStatus != IResultCode::SUCCESS) {
+					response.write(resultStatus);
+					resultCode = resultStatus;
 					return true;
 				}
 
 				try {
 					handler->deserialize(parameters);
 				} catch (Utilities::DataStream::ReadPastEndException&) {
-					response.write(resultCode);
+					response.write(resultStatus);
+					resultCode = resultStatus;
 					return true;
 				}
 	
 				context.beginTransaction();
-				resultCode = handler->process(authenticatedId, context);
+				resultStatus = handler->process(authenticatedId, context);
 				try {
 					context.commitTransaction();
 				} catch (const Utilities::SQLDatabase::Exception& e) {
 					std::cout << e.what << std::endl;
 					context.rollbackTransaction();
-					resultCode = IResultCode::SERVER_ERROR;
+					resultStatus = IResultCode::SERVER_ERROR;
 				}
 
-				response.write<ResultCode>(static_cast<ResultCode>(resultCode));
-				if (resultCode == IResultCode::SUCCESS)
+				response.write<ResultCode>(static_cast<ResultCode>(resultStatus));
+				if (resultStatus == IResultCode::SUCCESS)
 					handler->serialize(response);
 
 				delete handler;
@@ -167,6 +174,7 @@ namespace GameServer {
 					client.state = reinterpret_cast<void*>(authenticatedId);
 				}
 
+				resultCode = resultStatus;
 				return true;
 			}
 	};
