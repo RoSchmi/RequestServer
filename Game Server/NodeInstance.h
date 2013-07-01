@@ -23,6 +23,7 @@ namespace GameServer {
 	template<typename T> class NodeInstance {
 		private:
 			Utilities::RequestServer* requestServer;
+			Utilities::SQLDatabase::Connection::Parameters dbParameters;
 
 		public:
 			libconfig::Config config;
@@ -38,13 +39,12 @@ namespace GameServer {
 				this->tcpPort = string(settings["tcpServerPort"].c_str());
 				this->wsPort = string(settings["webSocketServerPort"].c_str());
 				this->handlerCreator = handlerCreator;
+				this->contextCreator = contextCreator;
 				this->dbConnections = new T*[this->workers];
 				this->requestServer = nullptr;
 
 				const libconfig::Setting& dbSettings = settings["Database"];
-				Utilities::SQLDatabase::Connection::Parameters parameters = {dbSettings["host"].c_str(), dbSettings["port"].c_str(), dbSettings["dbname"].c_str(), dbSettings["role"].c_str(), dbSettings["password"].c_str()};
-				for (uint8 i = 0; i < this->workers; i++)
-					this->dbConnections[i] = contextCreator(parameters);
+				this->dbParameters = { dbSettings["host"].c_str(), dbSettings["port"].c_str(), dbSettings["dbname"].c_str(), dbSettings["role"].c_str(), dbSettings["password"].c_str() };
 			}
 
 			exported ~NodeInstance(){
@@ -58,6 +58,9 @@ namespace GameServer {
 			}
 
 			exported void run() {
+				for (uint8 i = 0; i < this->workers; i++)
+					this->dbConnections[i] = this->contextCreator(this->dbParameters);
+
 				std::vector<std::string> ports;
 				ports.push_back(this->tcpPort);
 				ports.push_back(this->wsPort);
@@ -103,6 +106,7 @@ namespace GameServer {
 			std::string tcpPort;
 			std::string wsPort;
 			HandlerCreator handlerCreator;
+			ContextCreator contextCreator;
 			T** dbConnections;
 
 			static void* onConnect(Utilities::RequestServer::Client& client, void* state) {
@@ -128,40 +132,39 @@ namespace GameServer {
 				node.clientsLock.unlock();
 			}
 
-			static bool onRequest(uint8 workerNumber, Utilities::RequestServer::Client& client, uint8 requestCategory, uint8 requestMethod, Utilities::DataStream& parameters, Utilities::DataStream& response, uint16& resultCode, void* state) {
+			static bool onRequest(uint8 workerNumber, Utilities::RequestServer::Client& client, uint8 requestCategory, uint8 requestMethod, Utilities::DataStream& parameters, Utilities::DataStream& response, void* state) {
 				NodeInstance& node = *static_cast<NodeInstance*>(state);
-				ResultCode resultStatus = IResultCode::SUCCESS;
+				ResultCode resultCode = IResultCode::SUCCESS;
 				T& context = *node.dbConnections[workerNumber];
 				ObjectId authenticatedId = reinterpret_cast<ObjectId>(client.state);
 				ObjectId startId = authenticatedId;
 
-				auto handler = node.handlerCreator(requestCategory, requestMethod, authenticatedId, resultStatus);
-				if (resultStatus != IResultCode::SUCCESS) {
-					response.write(resultStatus);
-					resultCode = resultStatus;
+				auto handler = node.handlerCreator(requestCategory, requestMethod, authenticatedId, resultCode);
+				if (resultCode != IResultCode::SUCCESS) {
+					response.write<ResultCode>(static_cast<ResultCode>(resultCode));
 					return true;
 				}
 
 				try {
 					handler->deserialize(parameters);
-				} catch (Utilities::DataStream::ReadPastEndException&) {
-					response.write(resultStatus);
-					resultCode = resultStatus;
+				}
+				catch (Utilities::DataStream::ReadPastEndException&) {
+					response.write<ResultCode>(static_cast<ResultCode>(IResultCode::SERVER_ERROR));
 					return true;
 				}
 	
 				context.beginTransaction();
-				resultStatus = handler->process(authenticatedId, context);
+				resultCode = handler->process(authenticatedId, context);
 				try {
 					context.commitTransaction();
 				} catch (const Utilities::SQLDatabase::Exception& e) {
 					std::cout << e.what << std::endl;
 					context.rollbackTransaction();
-					resultStatus = IResultCode::SERVER_ERROR;
+					resultCode = IResultCode::SERVER_ERROR;
 				}
 
-				response.write<ResultCode>(static_cast<ResultCode>(resultStatus));
-				if (resultStatus == IResultCode::SUCCESS)
+				response.write<ResultCode>(static_cast<ResultCode>(resultCode));
+				if (resultCode == IResultCode::SUCCESS)
 					handler->serialize(response);
 
 				delete handler;
@@ -174,7 +177,6 @@ namespace GameServer {
 					client.state = reinterpret_cast<void*>(authenticatedId);
 				}
 
-				resultCode = resultStatus;
 				return true;
 			}
 	};

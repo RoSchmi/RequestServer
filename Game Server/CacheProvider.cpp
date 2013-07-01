@@ -9,13 +9,14 @@ using namespace Utilities::SQLDatabase;
 using namespace GameServer;
 using namespace GameServer::Objects;
 
-ICacheProvider::ICacheProvider(Coordinate startX, Coordinate startY, Size width, Size height) {
+ICacheProvider::ICacheProvider(Coordinate startX, Coordinate startY, Size width, Size height, Size losRadius) {
 	this->startX = startX;
 	this->startY = startY;
 	this->endX = startX + width;
 	this->endY = startY + height;
 	this->width = width;
 	this->height = height;
+	this->losRadius = losRadius;
 	this->locationIndex = new IMap*[width * height];
 	memset(this->locationIndex, 0, width * height * sizeof(IMap*));
 }
@@ -142,7 +143,7 @@ map<ObjectId, IObject*> ICacheProvider::getByOwner(OwnerId ownerId) {
 	return this->ownerIndex[ownerId];
 }
 
-map<ObjectId, IMap*> ICacheProvider::getInOwnerLOS(OwnerId ownerId, Size radius) {
+map<ObjectId, IMap*> ICacheProvider::getInOwnerLOS(OwnerId ownerId) {
 	map<ObjectId, IObject*> ownerObjects = this->ownerIndex[ownerId];
 	
 	Coordinate startX, startY, endX, endY, x, y;
@@ -152,10 +153,10 @@ map<ObjectId, IMap*> ICacheProvider::getInOwnerLOS(OwnerId ownerId, Size radius)
 		if (!currentOwnerObject) 
 			continue;
 
-		startX = currentOwnerObject->x - radius;
-		startY = currentOwnerObject->y - radius;
-		endX = currentOwnerObject->x + radius;
-		endY = currentOwnerObject->y + radius;
+		startX = currentOwnerObject->x - this->losRadius;
+		startY = currentOwnerObject->y - this->losRadius;
+		endX = currentOwnerObject->x + this->losRadius;
+		endY = currentOwnerObject->y + this->losRadius;
 
 		this->clampToDimensions(startX, startY, endX, endY);
 
@@ -167,6 +168,21 @@ map<ObjectId, IMap*> ICacheProvider::getInOwnerLOS(OwnerId ownerId, Size radius)
 				}
 			}
 		}
+	}
+
+	return result;
+}
+
+map<ObjectId, IMap*> ICacheProvider::getInOwnerLOS(OwnerId ownerId, Coordinate x, Coordinate y, Size width, Size height) {
+	map<ObjectId, IMap*> result;
+
+	for (auto i : this->getInOwnerLOS(ownerId)) {
+		IMap* currentObject = dynamic_cast<IMap*>(i.second);
+		if (!currentObject)
+			continue;
+
+		if (currentObject->x >= x && currentObject->y >= y && currentObject->x <= x + width && currentObject->y <= y + height)
+			result[currentObject->id] = currentObject;
 	}
 
 	return result;

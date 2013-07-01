@@ -15,6 +15,7 @@ namespace GameServer {
 		Coordinate endY;
 		Size width;
 		Size height;
+		Size losRadius;
 
 		std::map<OwnerId, std::map<ObjectId, GameServer::Objects::IObject*>> ownerIndex;
 		std::map<ObjectId, GameServer::Objects::IObject*> idIndex;
@@ -26,7 +27,7 @@ namespace GameServer {
 		ICacheProvider& operator=(ICacheProvider&& other);
 		
 		public: 
-			exported ICacheProvider(Coordinate startX, Coordinate startY, Size width, Size height);
+			exported ICacheProvider(Coordinate startX, Coordinate startY, Size width, Size height, Size losRadius);
 			exported virtual ~ICacheProvider();
 			 
 			exported void remove(GameServer::Objects::IObject* object);
@@ -46,7 +47,8 @@ namespace GameServer {
 			exported bool isLocationInBounds(Coordinate x, Coordinate y, Size width = 1, Size height = 1);
 			 
 			exported std::map<ObjectId, GameServer::Objects::IObject*> getByOwner(OwnerId ownerId);
-			exported std::map<ObjectId, GameServer::Objects::IMap*> getInOwnerLOS(OwnerId ownerId, Size radius);
+			exported std::map<ObjectId, GameServer::Objects::IMap*> getInOwnerLOS(OwnerId ownerId);
+			exported std::map<ObjectId, GameServer::Objects::IMap*> getInOwnerLOS(OwnerId ownerId, Coordinate x, Coordinate y, Size width, Size height);
 			
 			exported std::vector<ObjectId> getUsersWithLOSAt(Coordinate x, Coordinate y, Size radius);
 	};
