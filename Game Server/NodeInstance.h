@@ -36,8 +36,8 @@ namespace GameServer {
 				libconfig::Setting& settings = this->config.getRoot();
 
 				this->workers = static_cast<uint32>(settings["workerThreads"]);
-				this->tcpPort = string(settings["tcpServerPort"].c_str());
-				this->wsPort = string(settings["webSocketServerPort"].c_str());
+				this->tcpPort = std::string(settings["tcpServerPort"].c_str());
+				this->wsPort = std::string(settings["webSocketServerPort"].c_str());
 				this->handlerCreator = handlerCreator;
 				this->contextCreator = contextCreator;
 				this->dbConnections = new T*[this->workers];

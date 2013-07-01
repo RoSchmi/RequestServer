@@ -1,13 +1,13 @@
 cmake_minimum_required(VERSION 2.8)
 project(GameServer)
 
-set(game_sources CacheProvider.cpp DBContext.cpp Objects.cpp)
+set(game_sources CacheProvider.cpp BrokerNode.cpp DBContext.cpp Objects.cpp)
 
 file(GLOB game_headers *.h)
 
 add_library(GameServer SHARED ${game_sources})
 
-set(CMAKE_CXX_FLAGS "-std=c++11 -flto -Wall -pedantic -Wno-overloaded-virtual ${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -pedantic -Wno-overloaded-virtual ${CMAKE_CXX_FLAGS}")
 
 find_package(Threads REQUIRED)
 find_package(PostgreSQL REQUIRED)
