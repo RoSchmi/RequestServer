@@ -77,9 +77,9 @@ namespace GameServer {
 				} while (input != 'c');
 			}
 
-			exported Utilities::DataStream getNewNotification() {
+			exported Utilities::DataStream getNewNotification(GameServer::ObjectId id, uint8 category, uint8 type) {
 				Utilities::DataStream stream;
-				Utilities::RequestServer::Message::getHeader(stream, 0, 0, 0);
+				Utilities::RequestServer::Message::getHeader(stream, id, category, type);
 				return stream;
 			}
 
