@@ -75,6 +75,9 @@ void ICacheProvider::clampToDimensions(Coordinate& startX, Coordinate& startY, C
 }
 
 IObject* ICacheProvider::getById(ObjectId searchId) {
+	if (this->idIndex.count(searchId) == 0)
+		return nullptr;
+
 	return this->idIndex[searchId];
 }
 
