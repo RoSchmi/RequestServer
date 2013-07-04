@@ -3,7 +3,6 @@
 #include <string>
 
 #include <Utilities/Time.h>
-#include <Utilities/Array.h>
 #include <Utilities/SQLDatabase.h>
 
 #include "Common.h"
