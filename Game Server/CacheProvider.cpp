@@ -118,11 +118,11 @@ bool ICacheProvider::isAreaEmpty(Coordinate x, Coordinate y, Size width, Size he
 	return true;
 }
 
-bool ICacheProvider::isLocationInLOS(Coordinate x, Coordinate y, OwnerId ownerId, Size radius) {
-	Coordinate endX = x + radius;
-	Coordinate endY = y + radius;
-	Coordinate startX = x - radius;
-	Coordinate startY = y - radius;
+bool ICacheProvider::isLocationInLOS(Coordinate x, Coordinate y, OwnerId ownerId) {
+	Coordinate endX = x + this->losRadius;
+	Coordinate endY = y + this->losRadius;
+	Coordinate startX = x - this->losRadius;
+	Coordinate startY = y - this->losRadius;
 
 	this->clampToDimensions(startX, startY, endX, endY);
 
@@ -191,12 +191,12 @@ map<ObjectId, IMap*> ICacheProvider::getInOwnerLOS(OwnerId ownerId, Coordinate x
 	return result;
 }
 
-std::vector<ObjectId> ICacheProvider::getUsersWithLOSAt(Coordinate x, Coordinate y, Size radius) {
+std::vector<ObjectId> ICacheProvider::getUsersWithLOSAt(Coordinate x, Coordinate y) {
 	map<ObjectId, ObjectId> resultMap; //we use a map to make it easy for large objects to only be added once
-	Coordinate endX = x + radius;
-	Coordinate endY = y + radius;
-	Coordinate startX = x - radius;
-	Coordinate startY = y - radius;
+	Coordinate endX = x + this->losRadius;
+	Coordinate endY = y + this->losRadius;
+	Coordinate startX = x - this->losRadius;
+	Coordinate startY = y - this->losRadius;
 
 	this->clampToDimensions(startX, startY, endX, endY);
 				

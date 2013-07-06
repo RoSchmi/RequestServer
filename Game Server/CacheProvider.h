@@ -43,13 +43,13 @@ namespace GameServer {
 			 
 			exported std::map<ObjectId, GameServer::Objects::IMap*> getInArea(Coordinate x, Coordinate y, Size width = 1, Size height = 1);
 			exported bool isAreaEmpty(Coordinate x, Coordinate y, Size width = 1, Size height = 1);
-			exported bool isLocationInLOS(Coordinate x, Coordinate y, OwnerId ownerId, Size radius);
+			exported bool isLocationInLOS(Coordinate x, Coordinate y, OwnerId ownerId);
 			exported bool isLocationInBounds(Coordinate x, Coordinate y, Size width = 1, Size height = 1);
 			 
 			exported std::map<ObjectId, GameServer::Objects::IObject*> getByOwner(OwnerId ownerId);
 			exported std::map<ObjectId, GameServer::Objects::IMap*> getInOwnerLOS(OwnerId ownerId);
 			exported std::map<ObjectId, GameServer::Objects::IMap*> getInOwnerLOS(OwnerId ownerId, Coordinate x, Coordinate y, Size width, Size height);
 			
-			exported std::vector<ObjectId> getUsersWithLOSAt(Coordinate x, Coordinate y, Size radius);
+			exported std::vector<ObjectId> getUsersWithLOSAt(Coordinate x, Coordinate y);
 	};
 }
