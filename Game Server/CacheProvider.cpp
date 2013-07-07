@@ -142,6 +142,10 @@ bool ICacheProvider::isLocationInBounds(Coordinate x, Coordinate y, Size width, 
 	return x >= this->startX && y >= this->startY && x + width <= this->endX && y + height <= this->endY;
 }
 
+bool ICacheProvider::isUserPresent(ObjectId userId) {
+	return this->idIndex.count(userId) != 0;
+}
+
 map<ObjectId, IObject*> ICacheProvider::getByOwner(OwnerId ownerId) {
 	return this->ownerIndex[ownerId];
 }

@@ -45,6 +45,7 @@ namespace GameServer {
 			exported bool isAreaEmpty(Coordinate x, Coordinate y, Size width = 1, Size height = 1);
 			exported bool isLocationInLOS(Coordinate x, Coordinate y, OwnerId ownerId);
 			exported bool isLocationInBounds(Coordinate x, Coordinate y, Size width = 1, Size height = 1);
+			exported bool isUserPresent(ObjectId userId);
 			 
 			exported std::map<ObjectId, GameServer::Objects::IObject*> getByOwner(OwnerId ownerId);
 			exported std::map<ObjectId, GameServer::Objects::IMap*> getInOwnerLOS(OwnerId ownerId);
