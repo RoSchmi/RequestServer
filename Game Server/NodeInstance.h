@@ -94,11 +94,14 @@ namespace GameServer {
 				flags.push_back(true);
 
 				this->requestServer = new Utilities::RequestServer(ports, this->workers, flags, IResultCode::RETRY_LATER, onRequest, onConnect, onDisconnect, this);
-				this->brokerNode = new Utilities::Net::TCPConnection(this->brokerAddress, this->brokerPort, this);
-				this->brokerAsyncWorker.registerSocket(this->brokerNode->getBaseSocket(), this->brokerNode);
-				this->brokerAsyncWorker.start();
-				this->brokerClient = new Utilities::RequestServer::Client(this->brokerNode, this->requestServer, this->brokerNode->getBaseSocket().getRemoteAddress());
-				this->brokerNode->send(reinterpret_cast<uint8*>(&this->areaId), sizeof(ObjectId));
+
+				if (this->areaId != 0) {
+					this->brokerNode = new Utilities::Net::TCPConnection(this->brokerAddress, this->brokerPort, this);
+					this->brokerAsyncWorker.registerSocket(this->brokerNode->getBaseSocket(), this->brokerNode);
+					this->brokerAsyncWorker.start();
+					this->brokerClient = new Utilities::RequestServer::Client(this->brokerNode, this->requestServer, this->brokerNode->getBaseSocket().getRemoteAddress());
+					this->brokerNode->send(reinterpret_cast<uint8*>(&this->areaId), sizeof(ObjectId));
+				}
 
 				int8 input;
 				do {
