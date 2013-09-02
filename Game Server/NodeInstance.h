@@ -99,7 +99,7 @@ namespace GameServer {
 					this->brokerNode = new Utilities::Net::TCPConnection(this->brokerAddress, this->brokerPort, this);
 					this->brokerAsyncWorker.registerSocket(this->brokerNode->getBaseSocket(), this->brokerNode);
 					this->brokerAsyncWorker.start();
-					this->brokerClient = new Utilities::RequestServer::Client(this->brokerNode, this->requestServer, this->brokerNode->getBaseSocket().getRemoteAddress());
+					this->brokerClient = new Utilities::RequestServer::Client(*this->brokerNode, *this->requestServer, this->brokerNode->getBaseSocket().getRemoteAddress());
 					this->brokerNode->send(reinterpret_cast<uint8*>(&this->areaId), sizeof(ObjectId));
 				}
 
@@ -131,14 +131,14 @@ namespace GameServer {
 
 			exported void sendToBroker(ObjectId recepientAreaId, Utilities::DataStream& stream) {
 				this->brokerNode->addPart(reinterpret_cast<uint8*>(&recepientAreaId), sizeof(ObjectId));
-				this->brokerNode->addPart(stream.getBuffer, stream.getLength());
+				this->brokerNode->addPart(stream.getBuffer(), stream.getLength());
 				this->brokerNode->sendParts();
 			}
 
 		private:
 			static void onBrokerReceived(const Utilities::Net::Socket& socket, void* state) {
 				auto& connection = *static_cast<Utilities::Net::TCPConnection*>(state);
-				NodeInstance& node = *static_cast<NodeInstance*>(connection.state);
+				NodeInstance& node = *static_cast<NodeInstance*>(connection.getState());
 				auto messages = connection.read(0);
 
 				if (messages.getCount() == 0)
@@ -146,8 +146,7 @@ namespace GameServer {
 
 				for (auto& i : messages) {
 					Utilities::DataStream stream(i.data, i.length);
-					Utilities::RequestServer::Message message(stream, node->brokerClient);
-					node.requestServer->addToIncomingQueue(message);
+					node.requestServer->addToIncomingQueue(new Utilities::RequestServer::Message(*node.brokerClient, stream));
 				}
 			}
 
