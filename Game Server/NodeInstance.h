@@ -13,6 +13,8 @@
 #include <Utilities/Common.h>
 #include <Utilities/SQLDatabase.h>
 #include <Utilities/RequestServer.h>
+#include <Utilities/TCPConnection.h>
+#include <Utilities/Socket.h>
 
 #include "BaseMessages.h"
 #include "DBContext.h"
@@ -21,27 +23,46 @@
 
 namespace GameServer {
 	template<typename T> class NodeInstance {
+		public:
+			typedef BaseRequest<T>* (*HandlerCreator)(uint8 category, uint8 method, uint64 userId, uint16& errorCode);
+			typedef T* (*ContextCreator)(Utilities::SQLDatabase::Connection::Parameters& parameters);
+
 		private:
 			Utilities::RequestServer* requestServer;
 			Utilities::SQLDatabase::Connection::Parameters dbParameters;
+			Utilities::Net::TCPConnection* brokerNode;
+			Utilities::Net::SocketAsyncWorker brokerAsyncWorker;
+			Utilities::RequestServer::Client* brokerClient;
+			ObjectId areaId;
+			std::map<ObjectId, std::vector<Utilities::RequestServer::Client*>> authenticatedClients;
+			std::mutex clientsLock;
+			uint32 workers;
+			std::string brokerAddress;
+			std::string brokerPort;
+			std::string tcpPort;
+			std::string wsPort;
+			HandlerCreator handlerCreator;
+			ContextCreator contextCreator;
+			T** dbConnections;
 
 		public:
 			libconfig::Config config;
 
-			typedef BaseRequest<T>* (*HandlerCreator)(uint8 category, uint8 method, uint64 userId, uint16& errorCode);
-			typedef T* (*ContextCreator)(Utilities::SQLDatabase::Connection::Parameters& parameters);
-
-			exported NodeInstance(HandlerCreator handlerCreator, ContextCreator contextCreator, std::string configFileName) {
+			exported NodeInstance(HandlerCreator handlerCreator, ContextCreator contextCreator, std::string configFileName, ObjectId areaId) : brokerAsyncWorker(NodeInstance::onBrokerReceived) {
 				this->config.readFile(configFileName.c_str());
 				libconfig::Setting& settings = this->config.getRoot();
 
 				this->workers = static_cast<uint32>(settings["workerThreads"]);
 				this->tcpPort = std::string(settings["tcpServerPort"].c_str());
 				this->wsPort = std::string(settings["webSocketServerPort"].c_str());
+				this->brokerPort = std::string(settings["brokerPort"].c_str());
+				this->brokerAddress = std::string(settings["brokerAddress"].c_str());
 				this->handlerCreator = handlerCreator;
 				this->contextCreator = contextCreator;
 				this->dbConnections = new T*[this->workers];
 				this->requestServer = nullptr;
+				this->brokerClient = nullptr;
+				this->areaId = areaId;
 
 				const libconfig::Setting& dbSettings = settings["Database"];
 				this->dbParameters = { dbSettings["host"].c_str(), dbSettings["port"].c_str(), dbSettings["dbname"].c_str(), dbSettings["role"].c_str(), dbSettings["password"].c_str() };
@@ -55,6 +76,9 @@ namespace GameServer {
 
 				if (this->requestServer)
 					delete this->requestServer;
+
+				if (this->brokerClient)
+					delete this->brokerClient;
 			}
 
 			exported void run() {
@@ -70,6 +94,11 @@ namespace GameServer {
 				flags.push_back(true);
 
 				this->requestServer = new Utilities::RequestServer(ports, this->workers, flags, IResultCode::RETRY_LATER, onRequest, onConnect, onDisconnect, this);
+				this->brokerNode = new Utilities::Net::TCPConnection(this->brokerAddress, this->brokerPort, this);
+				this->brokerAsyncWorker.registerSocket(this->brokerNode->getBaseSocket(), this->brokerNode);
+				this->brokerAsyncWorker.start();
+				this->brokerClient = new Utilities::RequestServer::Client(this->brokerNode, this->requestServer, this->brokerNode->getBaseSocket().getRemoteAddress());
+				this->brokerNode->send(reinterpret_cast<uint8*>(&this->areaId), sizeof(ObjectId));
 
 				int8 input;
 				do {
@@ -77,7 +106,7 @@ namespace GameServer {
 				} while (input != 'c');
 			}
 
-			exported Utilities::DataStream getNewNotification(uint16 messageId, uint8 category, uint8 type) {
+			exported Utilities::DataStream getNewMessage(uint16 messageId, uint8 category, uint8 type) {
 				Utilities::DataStream stream;
 				Utilities::RequestServer::Message::getHeader(stream, messageId, category, type);
 				return stream;
@@ -97,17 +126,27 @@ namespace GameServer {
 				this->clientsLock.unlock();
 			}
 
+			exported void sendToBroker(ObjectId recepientAreaId, Utilities::DataStream& stream) {
+				this->brokerNode->addPart(reinterpret_cast<uint8*>(&recepientAreaId), sizeof(ObjectId));
+				this->brokerNode->addPart(stream.getBuffer, stream.getLength());
+				this->brokerNode->sendParts();
+			}
 
 		private:
-			std::map<ObjectId, std::vector<Utilities::RequestServer::Client*>> authenticatedClients;
-			std::mutex clientsLock;
+			static void onBrokerReceived(const Utilities::Net::Socket& socket, void* state) {
+				auto& connection = *static_cast<Utilities::Net::TCPConnection*>(state);
+				NodeInstance& node = *static_cast<NodeInstance*>(connection.state);
+				auto messages = connection.read(0);
 
-			uint32 workers;
-			std::string tcpPort;
-			std::string wsPort;
-			HandlerCreator handlerCreator;
-			ContextCreator contextCreator;
-			T** dbConnections;
+				if (messages.getCount() == 0)
+					return;
+
+				for (auto& i : messages) {
+					Utilities::DataStream stream(i.data, i.length);
+					Utilities::RequestServer::Message message(stream, node->brokerClient);
+					node.requestServer->addToIncomingQueue(message);
+				}
+			}
 
 			static void* onConnect(Utilities::RequestServer::Client& client, void* state) {
 				return nullptr;
