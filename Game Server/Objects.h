@@ -2,7 +2,6 @@
 
 #include <string>
 
-#include <Utilities/Time.h>
 #include <Utilities/SQLDatabase.h>
 
 #include "Common.h"
