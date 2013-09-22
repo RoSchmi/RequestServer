@@ -29,11 +29,12 @@ void BrokerNode::onRequestReceived(TCPConnection& connection, void* state, TCPCo
 	BrokerNode& node = *reinterpret_cast<BrokerNode*>(state);
 
 	if (message.wasClosed) {
-		auto iter = std::find(node.servers.begin(), node.servers.end(), &connection);
-		if (iter != node.servers.end())
-			node.servers.erase(iter);
-
-		return;
+		for (auto i : node.servers) {
+			if (i.second == &connection) {
+				node.servers.erase(i.first);
+				return;
+			}
+		}
 	}
 
 	if (message.length < sizeof(ObjectId))
