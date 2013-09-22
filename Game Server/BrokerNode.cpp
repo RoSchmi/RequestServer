@@ -21,19 +21,20 @@ BrokerNode::~BrokerNode() {
 
 }
 
-void BrokerNode::run() {
-	int8 input;
-	do {
-		cin >> input;
-	} while (input != 'c');
-}
-
 void* BrokerNode::onClientConnect(TCPConnection& connection, void* serverState, const uint8 clientAddress[Net::Socket::ADDRESS_LENGTH]) {
 	return serverState;
 }
 
 void BrokerNode::onRequestReceived(TCPConnection& connection, void* state, TCPConnection::Message& message) {
 	BrokerNode& node = *reinterpret_cast<BrokerNode*>(state);
+
+	if (message.wasClosed) {
+		auto iter = std::find(node.servers.begin(), node.servers.end(), &connection);
+		if (iter != node.servers.end())
+			node.servers.erase(iter);
+
+		return;
+	}
 
 	if (message.length < sizeof(ObjectId))
 		return;

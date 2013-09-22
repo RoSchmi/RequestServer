@@ -21,7 +21,5 @@ namespace GameServer {
 		public:
 			exported BrokerNode(cstr port);
 			exported ~BrokerNode();
-			 
-			exported void run();
 	};
 }

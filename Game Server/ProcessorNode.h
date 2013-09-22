@@ -59,41 +59,18 @@ namespace GameServer {
 				this->brokerAddress = std::string(settings["brokerAddress"].c_str());
 				this->handlerCreator = handlerCreator;
 				this->contextCreator = contextCreator;
-				this->dbConnections = new T*[this->workers];
 				this->requestServer = nullptr;
 				this->brokerClient = nullptr;
 				this->areaId = areaId;
 
 				const libconfig::Setting& dbSettings = settings["Database"];
 				this->dbParameters = { dbSettings["host"].c_str(), dbSettings["port"].c_str(), dbSettings["dbname"].c_str(), dbSettings["role"].c_str(), dbSettings["password"].c_str() };
-			}
 
-			exported ~NodeInstance(){
-				for (uint8 i = 0; i < this->workers; i++)
-					delete this->dbConnections[i];
-
-				delete[] this->dbConnections;
-
-				if (this->requestServer)
-					delete this->requestServer;
-
-				if (this->brokerClient)
-					delete this->brokerClient;
-			}
-
-			exported void run() {
+				this->dbConnections = new T*[this->workers];
 				for (uint8 i = 0; i < this->workers; i++)
 					this->dbConnections[i] = this->contextCreator(this->dbParameters);
 
-				std::vector<std::string> ports;
-				ports.push_back(this->tcpPort);
-				ports.push_back(this->wsPort);
-
-				std::vector<bool> flags;
-				flags.push_back(false);
-				flags.push_back(true);
-
-				this->requestServer = new Utilities::RequestServer(ports, this->workers, flags, IResultCode::RETRY_LATER, onRequest, onConnect, onDisconnect, this);
+				this->requestServer = new Utilities::RequestServer({ this->tcpPort, this->wsPort }, this->workers, { false, true }, IResultCode::RETRY_LATER, onRequest, onConnect, onDisconnect, this);
 
 				if (this->areaId != 0) {
 					this->brokerNode = new Utilities::Net::TCPConnection(this->brokerAddress, this->brokerPort, this);
@@ -102,11 +79,18 @@ namespace GameServer {
 					this->brokerClient = new Utilities::RequestServer::Client(*this->brokerNode, *this->requestServer, this->brokerNode->getBaseSocket().getRemoteAddress());
 					this->brokerNode->send(reinterpret_cast<uint8*>(&this->areaId), sizeof(ObjectId));
 				}
+			}
 
-				int8 input;
-				do {
-					std::cin >> input;
-				} while (input != 'c');
+			exported ~NodeInstance(){
+				for (uint8 i = 0; i < this->workers; i++)
+					delete this->dbConnections[i];
+
+				delete[] this->dbConnections;
+
+				delete this->requestServer;
+
+				if (this->brokerClient)
+					delete this->brokerClient;
 			}
 
 			exported Utilities::DataStream getNewMessage(uint16 messageId, uint8 category, uint8 type) {
@@ -164,6 +148,7 @@ namespace GameServer {
 				if (i != node.authenticatedClients.end()) {
 					auto& list = i->second;
 					auto j = std::find(list.begin(), list.end(), &client);
+
 					list.erase(j);
 
 					if (list.size() == 0)
@@ -181,34 +166,30 @@ namespace GameServer {
 				ObjectId startId = authenticatedId;
 
 				auto handler = node.handlerCreator(requestCategory, requestMethod, authenticatedId, resultCode);
-				if (resultCode != IResultCode::SUCCESS) {
-					response.write<ResultCode>(static_cast<ResultCode>(resultCode));
-					return true;
-				}
+				if (!handler)
+					goto end;
 
 				try {
 					handler->deserialize(parameters);
 				}
 				catch (Utilities::DataStream::ReadPastEndException&) {
-					response.write<ResultCode>(static_cast<ResultCode>(IResultCode::SERVER_ERROR));
-					return true;
+					resultCode = IResultCode::SERVER_ERROR;
+					goto end;
 				}
 	
 				context.beginTransaction();
 				resultCode = handler->process(authenticatedId, context);
 				try {
 					context.commitTransaction();
-				} catch (const Utilities::SQLDatabase::Exception& e) {
-					std::cout << e.what << std::endl;
+				} catch (const Utilities::SQLDatabase::Exception&) {
 					context.rollbackTransaction();
 					resultCode = IResultCode::SERVER_ERROR;
 				}
 
-				response.write<ResultCode>(static_cast<ResultCode>(resultCode));
+			end:
+				response.write(resultCode);
 				if (resultCode == IResultCode::SUCCESS)
 					handler->serialize(response);
-
-				delete handler;
 
 				//It is invalid to change the authenticated id more than once per session.
 				if (authenticatedId != startId) {
@@ -217,6 +198,8 @@ namespace GameServer {
 					node.clientsLock.unlock();
 					client.state = reinterpret_cast<void*>(authenticatedId);
 				}
+
+				delete handler;
 
 				return true;
 			}
