@@ -4,7 +4,7 @@
 
 #include <Utilities/SQLDatabase.h>
 
-#include "CacheProvider.h"
+#include "ICacheProvider.h"
 #include "Objects.h"
 
 namespace GameServer {

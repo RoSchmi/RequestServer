@@ -19,7 +19,6 @@
     <ClInclude Include="BrokerNode.h" />
     <ClInclude Include="Common.h" />
     <ClInclude Include="ProcessorNode.h" />
-    <ClInclude Include="BaseMessages.h" />
     <ClInclude Include="Objects.h" />
     <ClInclude Include="Collections.h" />
     <ClInclude Include="ICacheProvider.h" />

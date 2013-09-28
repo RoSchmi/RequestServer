@@ -22,6 +22,13 @@
 #include "Common.h"
 
 namespace GameServer {
+	template<typename T> class BaseRequest {
+		public:
+			exported virtual ResultCode process(ObjectId& userId, T& db) = 0;
+			exported virtual void deserialize(Utilities::DataStream& parameters) = 0;
+			exported virtual void serialize(Utilities::DataStream& response) = 0;
+	};
+
 	template<typename T> class NodeInstance {
 		public:
 			typedef BaseRequest<T>* (*HandlerCreator)(uint8 category, uint8 method, uint64 userId, uint16& errorCode);
