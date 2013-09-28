@@ -12,7 +12,7 @@
   <ItemGroup>
     <ClCompile Include="BrokerNode.cpp" />
     <ClCompile Include="Objects.cpp" />
-    <ClCompile Include="CacheProvider.cpp" />
+    <ClCompile Include="ICacheProvider.cpp" />
     <ClCompile Include="IDBContext.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -22,7 +22,7 @@
     <ClInclude Include="BaseMessages.h" />
     <ClInclude Include="Objects.h" />
     <ClInclude Include="Collections.h" />
-    <ClInclude Include="CacheProvider.h" />
+    <ClInclude Include="ICacheProvider.h" />
     <ClInclude Include="IDBContext.h" />
   </ItemGroup>
   <ItemGroup>

@@ -1,13 +1,13 @@
-#include "CacheProvider.h"
+#include "ICacheProvider.h"
 
 #include <algorithm>
 #include <cstring>
-#include <exception>
 
 using namespace std;
+using namespace Utilities;
 using namespace Utilities::SQLDatabase;
 using namespace GameServer;
-using namespace GameServer::Objects;
+using namespace Objects;
 
 ICacheProvider::ICacheProvider(coord startX, coord startY, size width, size height, size losRadius) {
 	this->startX = startX;
@@ -85,8 +85,8 @@ IMapObject*& ICacheProvider::getByLocation(coord x, coord y) {
 	return this->locationIndex[this->width * static_cast<ObjectId>(y - this->startY) + static_cast<ObjectId>(x - this->startX)];
 }
 
-map<ObjectId, IMapObject*> ICacheProvider::getInArea(coord x, coord y, size width, size height) {
-	map<ObjectId, IMapObject*> result; //we use a map to make it easy for large objects to only be added once
+vector<IMapObject*> ICacheProvider::getInArea(coord x, coord y, size width, size height) {
+	vector<IMapObject*> result;
 	coord endX = x + width;
 	coord endY = y + height;
 
@@ -95,7 +95,7 @@ map<ObjectId, IMapObject*> ICacheProvider::getInArea(coord x, coord y, size widt
 	for (; x < endX; x++) {
 		for (y = endY - height; y < endY; y++) {
 			IMapObject* current = this->getByLocation(x, y);
-			if (current) {
+			if (current && current->x == x && current->y == y) {
 				result[current->id] = current;
 			}
 		}
@@ -146,15 +146,15 @@ bool ICacheProvider::isUserPresent(ObjectId userId) {
 	return this->idIndex.count(userId) != 0;
 }
 
-map<ObjectId, IObject*> ICacheProvider::getByOwner(OwnerId ownerId) {
+const unordered_map<ObjectId, IObject*> ICacheProvider::getByOwner(OwnerId ownerId) {
 	return this->ownerIndex[ownerId];
 }
 
-map<ObjectId, IMapObject*> ICacheProvider::getInOwnerLOS(OwnerId ownerId) {
-	map<ObjectId, IObject*> ownerObjects = this->ownerIndex[ownerId];
+vector<IMapObject*> ICacheProvider::getInOwnerLOS(OwnerId ownerId) {
+	unordered_map<ObjectId, IObject*> ownerObjects = this->ownerIndex[ownerId];
 	
 	coord startX, startY, endX, endY, x, y;
-	map<ObjectId, IMapObject*> result;
+	vector<IMapObject*> result;
 	for (auto i : ownerObjects) {
 		IMapObject* currentOwnerObject = dynamic_cast<IMapObject*>(i.second);
 		if (!currentOwnerObject) 
@@ -167,12 +167,11 @@ map<ObjectId, IMapObject*> ICacheProvider::getInOwnerLOS(OwnerId ownerId) {
 
 		this->clampToDimensions(startX, startY, endX, endY);
 
-		for (x = startX; x < endX; ++x) {
-			for (y = startY; y < endY; ++y) {
+		for (x = startX; x < endX; x++) {
+			for (y = startY; y < endY; y++) {
 				IMapObject* currentTestObject = this->getByLocation(x, y);
-				if (currentTestObject) {
-					result[currentTestObject->id] = currentTestObject;
-				}
+				if (currentTestObject && currentTestObject->x == x && currentTestObject->y == y)
+					result.push_back(currentTestObject);
 			}
 		}
 	}
@@ -180,11 +179,11 @@ map<ObjectId, IMapObject*> ICacheProvider::getInOwnerLOS(OwnerId ownerId) {
 	return result;
 }
 
-map<ObjectId, IMapObject*> ICacheProvider::getInOwnerLOS(OwnerId ownerId, coord x, coord y, size width, size height) {
-	map<ObjectId, IMapObject*> result;
+vector<IMapObject*> ICacheProvider::getInOwnerLOS(OwnerId ownerId, coord x, coord y, size width, size height) {
+	vector<IMapObject*> result;
 
 	for (auto i : this->getInOwnerLOS(ownerId)) {
-		IMapObject* currentObject = dynamic_cast<IMapObject*>(i.second);
+		IMapObject* currentObject = dynamic_cast<IMapObject*>(i);
 		if (!currentObject)
 			continue;
 
@@ -195,8 +194,8 @@ map<ObjectId, IMapObject*> ICacheProvider::getInOwnerLOS(OwnerId ownerId, coord 
 	return result;
 }
 
-std::vector<ObjectId> ICacheProvider::getUsersWithLOSAt(coord x, coord y) {
-	map<ObjectId, ObjectId> resultMap; //we use a map to make it easy for large objects to only be added once
+std::unordered_set<ObjectId> ICacheProvider::getUsersWithLOSAt(coord x, coord y) {
+	unordered_set<ObjectId> result;
 	coord endX = x + this->losRadius;
 	coord endY = y + this->losRadius;
 	coord startX = x - this->losRadius;
@@ -204,18 +203,13 @@ std::vector<ObjectId> ICacheProvider::getUsersWithLOSAt(coord x, coord y) {
 
 	this->clampToDimensions(startX, startY, endX, endY);
 				
-	for (coord thiX = startX; thiX < endX; thiX++) {
+	for (coord thisX = startX; thisX < endX; thisX++) {
 		for (coord thisY = startY; thisY < endY; thisY++) {
-			IMapObject* current = this->getByLocation(thiX, thisY);
-			if (current) {
-				resultMap[current->ownerId] = current->ownerId;
-			}
+			IMapObject* current = this->getByLocation(thisX, thisY);
+			if (current)
+				result.insert(current->ownerId);
 		}
 	}
-
-	vector<ObjectId> result;
-	for (auto i : resultMap)
-		result.push_back(i.first);
 
 	return result;
 }
