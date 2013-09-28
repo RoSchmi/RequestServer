@@ -13,7 +13,7 @@
     <ClCompile Include="BrokerNode.cpp" />
     <ClCompile Include="Objects.cpp" />
     <ClCompile Include="CacheProvider.cpp" />
-    <ClCompile Include="DBContext.cpp" />
+    <ClCompile Include="IDBContext.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BrokerNode.h" />
@@ -23,7 +23,7 @@
     <ClInclude Include="Objects.h" />
     <ClInclude Include="Collections.h" />
     <ClInclude Include="CacheProvider.h" />
-    <ClInclude Include="DBContext.h" />
+    <ClInclude Include="IDBContext.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="CMakeLists.txt" />

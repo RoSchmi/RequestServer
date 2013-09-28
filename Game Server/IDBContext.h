@@ -2,9 +2,6 @@
 
 #include <Utilities/SQLDatabase.h>
 
-#include "CacheProvider.h"
-#include "Collections.h"
-#include "Objects.h"
 #include "Common.h"
 
 namespace GameServer {
@@ -13,10 +10,10 @@ namespace GameServer {
 		ObjectId endOfIssuedIdBlock;
 		bool transactionCommitted;
 		
-		IDBContext(const IDBContext& other);
-		IDBContext(IDBContext&& other);
-		IDBContext& operator=(const IDBContext& other);
-		IDBContext& operator=(IDBContext&& other);
+		IDBContext(const IDBContext& other) = delete;
+		IDBContext(IDBContext&& other) = delete;
+		IDBContext& operator=(const IDBContext& other) = delete;
+		IDBContext& operator=(IDBContext&& other) = delete;
 
 		public:
 			exported IDBContext(const Utilities::SQLDatabase::Connection::Parameters& connectionParameters);
@@ -25,8 +22,8 @@ namespace GameServer {
 			exported void beginTransaction();
 			exported void rollbackTransaction();
 			exported void commitTransaction();
-			exported ObjectId getNewId();
 			exported bool wasTransactionCommitted() const;
+			exported ObjectId getNewId();
 			
 			Utilities::SQLDatabase::Connection connection;
 	};
