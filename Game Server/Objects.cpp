@@ -11,7 +11,7 @@ IObject::~IObject() {
 
 }
 
-IMap::IMap(uint8 objectType) : IObject(objectType) {
+IMapObject::IMapObject(uint8 objectType) : IObject(objectType) {
 	this->width = 1;
 	this->height = 1;
 	this->planetId = 0;
@@ -19,6 +19,6 @@ IMap::IMap(uint8 objectType) : IObject(objectType) {
 	this->y = 0;
 }
 
-IMap::~IMap() {
+IMapObject::~IMapObject() {
 	
 }

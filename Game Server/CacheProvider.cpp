@@ -9,7 +9,7 @@ using namespace Utilities::SQLDatabase;
 using namespace GameServer;
 using namespace GameServer::Objects;
 
-ICacheProvider::ICacheProvider(Coordinate startX, Coordinate startY, Size width, Size height, Size losRadius) {
+ICacheProvider::ICacheProvider(coord startX, coord startY, size width, size height, size losRadius) {
 	this->startX = startX;
 	this->startY = startY;
 	this->endX = startX + width;
@@ -17,8 +17,8 @@ ICacheProvider::ICacheProvider(Coordinate startX, Coordinate startY, Size width,
 	this->width = width;
 	this->height = height;
 	this->losRadius = losRadius;
-	this->locationIndex = new IMap*[width * height];
-	memset(this->locationIndex, 0, width * height * sizeof(IMap*));
+	this->locationIndex = new IMapObject*[width * height];
+	memset(this->locationIndex, 0, width * height * sizeof(IMapObject*));
 }
 
 ICacheProvider::~ICacheProvider() {
@@ -33,11 +33,11 @@ void ICacheProvider::remove(IObject* object) {
 	this->ownerIndex[object->ownerId].erase(object->id);
 }
 
-void ICacheProvider::remove(IMap* object) {
+void ICacheProvider::remove(IMapObject* object) {
 	this->remove(static_cast<IObject*>(object));
 
-	for (Coordinate x = object->x; x < object->x + object->width; x++)
-		for (Coordinate y = object->y; y < object->y + object->height; y++)
+	for (coord x = object->x; x < object->x + object->width; x++)
+		for (coord y = object->y; y < object->y + object->height; y++)
 			this->getByLocation(x, y) = nullptr;
 }
 
@@ -46,28 +46,28 @@ void ICacheProvider::add(IObject* object) {
 	this->ownerIndex[object->ownerId][object->id] = object;
 }
 
-void ICacheProvider::add(IMap* object) {
+void ICacheProvider::add(IMapObject* object) {
 	this->add(static_cast<IObject*>(object));
 
-	for (Coordinate x = object->x; x < object->x + object->width; x++)
-		for (Coordinate y = object->y; y < object->y + object->height; y++)
+	for (coord x = object->x; x < object->x + object->width; x++)
+		for (coord y = object->y; y < object->y + object->height; y++)
 			this->getByLocation(x, y) = object;
 }
 
-void ICacheProvider::updateLocation(IMap* object, Coordinate newX, Coordinate newY) {
-	for (Coordinate x = object->x; x < object->x + object->width; x++)
-		for (Coordinate y = object->y; y < object->y + object->height; y++)
+void ICacheProvider::updateLocation(IMapObject* object, coord newX, coord newY) {
+	for (coord x = object->x; x < object->x + object->width; x++)
+		for (coord y = object->y; y < object->y + object->height; y++)
 			this->getByLocation(x, y) = nullptr;
 
 	object->x = newX;
 	object->y = newY;
 
-	for (Coordinate x = object->x; x < object->x + object->width; x++)
-		for (Coordinate y = object->y; y < object->y + object->height; y++)
+	for (coord x = object->x; x < object->x + object->width; x++)
+		for (coord y = object->y; y < object->y + object->height; y++)
 			this->getByLocation(x, y) = object;
 }
 
-void ICacheProvider::clampToDimensions(Coordinate& startX, Coordinate& startY, Coordinate& endX, Coordinate& endY) {
+void ICacheProvider::clampToDimensions(coord& startX, coord& startY, coord& endX, coord& endY) {
 	if (startX < this->startX) startX = this->startX;
 	if (startY < this->startY) startY = this->startY;
 	if (endX >= this->endX) endX = this->endX - 1;
@@ -81,20 +81,20 @@ IObject* ICacheProvider::getById(ObjectId searchId) {
 	return this->idIndex[searchId];
 }
 
-IMap*& ICacheProvider::getByLocation(Coordinate x, Coordinate y) {
+IMapObject*& ICacheProvider::getByLocation(coord x, coord y) {
 	return this->locationIndex[this->width * static_cast<ObjectId>(y - this->startY) + static_cast<ObjectId>(x - this->startX)];
 }
 
-map<ObjectId, IMap*> ICacheProvider::getInArea(Coordinate x, Coordinate y, Size width, Size height) {
-	map<ObjectId, IMap*> result; //we use a map to make it easy for large objects to only be added once
-	Coordinate endX = x + width;
-	Coordinate endY = y + height;
+map<ObjectId, IMapObject*> ICacheProvider::getInArea(coord x, coord y, size width, size height) {
+	map<ObjectId, IMapObject*> result; //we use a map to make it easy for large objects to only be added once
+	coord endX = x + width;
+	coord endY = y + height;
 
 	this->clampToDimensions(x, y, endX, endY);
 				
 	for (; x < endX; x++) {
 		for (y = endY - height; y < endY; y++) {
-			IMap* current = this->getByLocation(x, y);
+			IMapObject* current = this->getByLocation(x, y);
 			if (current) {
 				result[current->id] = current;
 			}
@@ -104,9 +104,9 @@ map<ObjectId, IMap*> ICacheProvider::getInArea(Coordinate x, Coordinate y, Size 
 	return result;
 }
 
-bool ICacheProvider::isAreaEmpty(Coordinate x, Coordinate y, Size width, Size height) {
-	Coordinate endX = x + width;
-	Coordinate endY = y + height;
+bool ICacheProvider::isAreaEmpty(coord x, coord y, size width, size height) {
+	coord endX = x + width;
+	coord endY = y + height;
 
 	this->clampToDimensions(x, y, endX, endY);
 	
@@ -118,17 +118,17 @@ bool ICacheProvider::isAreaEmpty(Coordinate x, Coordinate y, Size width, Size he
 	return true;
 }
 
-bool ICacheProvider::isLocationInLOS(Coordinate x, Coordinate y, OwnerId ownerId) {
-	Coordinate endX = x + this->losRadius;
-	Coordinate endY = y + this->losRadius;
-	Coordinate startX = x - this->losRadius;
-	Coordinate startY = y - this->losRadius;
+bool ICacheProvider::isLocationInLOS(coord x, coord y, OwnerId ownerId) {
+	coord endX = x + this->losRadius;
+	coord endY = y + this->losRadius;
+	coord startX = x - this->losRadius;
+	coord startY = y - this->losRadius;
 
 	this->clampToDimensions(startX, startY, endX, endY);
 
 	for (x = startX; x < endX; x++) {
 		for (y = startY; y < endY; y++) {
-			IMap* current = this->getByLocation(x, y);
+			IMapObject* current = this->getByLocation(x, y);
 			if (current && current->ownerId == ownerId) {
 				return true;
 			}
@@ -138,7 +138,7 @@ bool ICacheProvider::isLocationInLOS(Coordinate x, Coordinate y, OwnerId ownerId
 	return false;
 }
 
-bool ICacheProvider::isLocationInBounds(Coordinate x, Coordinate y, Size width, Size height) {
+bool ICacheProvider::isLocationInBounds(coord x, coord y, size width, size height) {
 	return x >= this->startX && y >= this->startY && x + width <= this->endX && y + height <= this->endY;
 }
 
@@ -150,13 +150,13 @@ map<ObjectId, IObject*> ICacheProvider::getByOwner(OwnerId ownerId) {
 	return this->ownerIndex[ownerId];
 }
 
-map<ObjectId, IMap*> ICacheProvider::getInOwnerLOS(OwnerId ownerId) {
+map<ObjectId, IMapObject*> ICacheProvider::getInOwnerLOS(OwnerId ownerId) {
 	map<ObjectId, IObject*> ownerObjects = this->ownerIndex[ownerId];
 	
-	Coordinate startX, startY, endX, endY, x, y;
-	map<ObjectId, IMap*> result;
+	coord startX, startY, endX, endY, x, y;
+	map<ObjectId, IMapObject*> result;
 	for (auto i : ownerObjects) {
-		IMap* currentOwnerObject = dynamic_cast<IMap*>(i.second);
+		IMapObject* currentOwnerObject = dynamic_cast<IMapObject*>(i.second);
 		if (!currentOwnerObject) 
 			continue;
 
@@ -169,7 +169,7 @@ map<ObjectId, IMap*> ICacheProvider::getInOwnerLOS(OwnerId ownerId) {
 
 		for (x = startX; x < endX; ++x) {
 			for (y = startY; y < endY; ++y) {
-				IMap* currentTestObject = this->getByLocation(x, y);
+				IMapObject* currentTestObject = this->getByLocation(x, y);
 				if (currentTestObject) {
 					result[currentTestObject->id] = currentTestObject;
 				}
@@ -180,11 +180,11 @@ map<ObjectId, IMap*> ICacheProvider::getInOwnerLOS(OwnerId ownerId) {
 	return result;
 }
 
-map<ObjectId, IMap*> ICacheProvider::getInOwnerLOS(OwnerId ownerId, Coordinate x, Coordinate y, Size width, Size height) {
-	map<ObjectId, IMap*> result;
+map<ObjectId, IMapObject*> ICacheProvider::getInOwnerLOS(OwnerId ownerId, coord x, coord y, size width, size height) {
+	map<ObjectId, IMapObject*> result;
 
 	for (auto i : this->getInOwnerLOS(ownerId)) {
-		IMap* currentObject = dynamic_cast<IMap*>(i.second);
+		IMapObject* currentObject = dynamic_cast<IMapObject*>(i.second);
 		if (!currentObject)
 			continue;
 
@@ -195,18 +195,18 @@ map<ObjectId, IMap*> ICacheProvider::getInOwnerLOS(OwnerId ownerId, Coordinate x
 	return result;
 }
 
-std::vector<ObjectId> ICacheProvider::getUsersWithLOSAt(Coordinate x, Coordinate y) {
+std::vector<ObjectId> ICacheProvider::getUsersWithLOSAt(coord x, coord y) {
 	map<ObjectId, ObjectId> resultMap; //we use a map to make it easy for large objects to only be added once
-	Coordinate endX = x + this->losRadius;
-	Coordinate endY = y + this->losRadius;
-	Coordinate startX = x - this->losRadius;
-	Coordinate startY = y - this->losRadius;
+	coord endX = x + this->losRadius;
+	coord endY = y + this->losRadius;
+	coord startX = x - this->losRadius;
+	coord startY = y - this->losRadius;
 
 	this->clampToDimensions(startX, startY, endX, endY);
 				
-	for (Coordinate thiX = startX; thiX < endX; thiX++) {
-		for (Coordinate thisY = startY; thisY < endY; thisY++) {
-			IMap* current = this->getByLocation(thiX, thisY);
+	for (coord thiX = startX; thiX < endX; thiX++) {
+		for (coord thisY = startY; thisY < endY; thisY++) {
+			IMapObject* current = this->getByLocation(thiX, thisY);
 			if (current) {
 				resultMap[current->ownerId] = current->ownerId;
 			}

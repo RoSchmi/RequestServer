@@ -16,16 +16,16 @@ namespace GameServer {
 			uint8 objectType;
 		};
 
-		struct IMap : public IObject {
-			exported IMap(uint8 objectType);
-			exported virtual ~IMap();
+		struct IMapObject : public IObject {
+			exported IMapObject(uint8 objectType);
+			exported virtual ~IMapObject();
 			
 			ObjectId planetId;
-			Coordinate x;
-			Coordinate y;
+			coord x;
+			coord y;
 
-			Size width;
-			Size height;
+			size width;
+			size height;
 		};
 	}
 }

@@ -9,17 +9,17 @@
 
 namespace GameServer {
 	class ICacheProvider {
-		Coordinate startX;
-		Coordinate startY;
-		Coordinate endX;
-		Coordinate endY;
-		Size width;
-		Size height;
-		Size losRadius;
+		coord startX;
+		coord startY;
+		coord endX;
+		coord endY;
+		size width;
+		size height;
+		size losRadius;
 
 		std::map<OwnerId, std::map<ObjectId, GameServer::Objects::IObject*>> ownerIndex;
 		std::map<ObjectId, GameServer::Objects::IObject*> idIndex;
-		GameServer::Objects::IMap** locationIndex;
+		GameServer::Objects::IMapObject** locationIndex;
 		
 		ICacheProvider(const ICacheProvider& other);
 		ICacheProvider(ICacheProvider&& other);
@@ -27,30 +27,30 @@ namespace GameServer {
 		ICacheProvider& operator=(ICacheProvider&& other);
 		
 		public: 
-			exported ICacheProvider(Coordinate startX, Coordinate startY, Size width, Size height, Size losRadius);
+			exported ICacheProvider(coord startX, coord startY, size width, size height, size losRadius);
 			exported virtual ~ICacheProvider();
 			 
 			exported void remove(GameServer::Objects::IObject* object);
-			exported void remove(GameServer::Objects::IMap* object);
+			exported void remove(GameServer::Objects::IMapObject* object);
 			exported void add(GameServer::Objects::IObject* object);
-			exported void add(GameServer::Objects::IMap* object);
-			exported void updateLocation(GameServer::Objects::IMap* object, Coordinate newX, Coordinate newY);
-			exported void clampToDimensions(Coordinate& startX, Coordinate& startY, Coordinate& endX, Coordinate& endY);
+			exported void add(GameServer::Objects::IMapObject* object);
+			exported void updateLocation(GameServer::Objects::IMapObject* object, coord newX, coord newY);
+			exported void clampToDimensions(coord& startX, coord& startY, coord& endX, coord& endY);
 
-			exported GameServer::Objects::IMap*& getByLocation(Coordinate x, Coordinate y);
+			exported GameServer::Objects::IMapObject*& getByLocation(coord x, coord y);
 			 
 			exported GameServer::Objects::IObject* getById(ObjectId searchId);
 			 
-			exported std::map<ObjectId, GameServer::Objects::IMap*> getInArea(Coordinate x, Coordinate y, Size width = 1, Size height = 1);
-			exported bool isAreaEmpty(Coordinate x, Coordinate y, Size width = 1, Size height = 1);
-			exported bool isLocationInLOS(Coordinate x, Coordinate y, OwnerId ownerId);
-			exported bool isLocationInBounds(Coordinate x, Coordinate y, Size width = 1, Size height = 1);
+			exported std::map<ObjectId, GameServer::Objects::IMapObject*> getInArea(coord x, coord y, size width = 1, size height = 1);
+			exported bool isAreaEmpty(coord x, coord y, size width = 1, size height = 1);
+			exported bool isLocationInLOS(coord x, coord y, OwnerId ownerId);
+			exported bool isLocationInBounds(coord x, coord y, size width = 1, size height = 1);
 			exported bool isUserPresent(ObjectId userId);
 			 
 			exported std::map<ObjectId, GameServer::Objects::IObject*> getByOwner(OwnerId ownerId);
-			exported std::map<ObjectId, GameServer::Objects::IMap*> getInOwnerLOS(OwnerId ownerId);
-			exported std::map<ObjectId, GameServer::Objects::IMap*> getInOwnerLOS(OwnerId ownerId, Coordinate x, Coordinate y, Size width, Size height);
+			exported std::map<ObjectId, GameServer::Objects::IMapObject*> getInOwnerLOS(OwnerId ownerId);
+			exported std::map<ObjectId, GameServer::Objects::IMapObject*> getInOwnerLOS(OwnerId ownerId, coord x, coord y, size width, size height);
 			
-			exported std::vector<ObjectId> getUsersWithLOSAt(Coordinate x, Coordinate y);
+			exported std::vector<ObjectId> getUsersWithLOSAt(coord x, coord y);
 	};
 }

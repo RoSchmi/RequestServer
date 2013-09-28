@@ -46,11 +46,11 @@ namespace GameServer {
 			return dynamic_cast<T*>(this->cache.getById(id));
 		}
 
-		exported T* getByLocation(Coordinate x, Coordinate y) {
+		exported T* getByLocation(coord x, coord y) {
 			return dynamic_cast<T*>(this->cache.getByLocation(x, y));
 		}
 
-		exported void updateLocation(T* object, Coordinate newX, Coordinate newY) {
+		exported void updateLocation(T* object, coord newX, coord newY) {
 			IDBCollection<T>::update(*object);
 			this->cache.updateLocation(object, newX, newY);
 		}
