@@ -1,8 +1,5 @@
 #include "BrokerNode.h"
 
-#include <map>
-#include <iostream>
-
 #include <Utilities/Common.h>
 #include <Utilities/TCPServer.h>
 
@@ -13,37 +10,56 @@ using namespace Utilities;
 using namespace Utilities::Net;
 using namespace GameServer;
 
-BrokerNode::BrokerNode(cstr port) : server(port, false, this, BrokerNode::onClientConnect, BrokerNode::onRequestReceived) {
-
+BrokerNode::BrokerNode(cstr port) : server(port, BrokerNode::onClientConnect, this) {
+	this->running = true;
+	this->ioWorker = thread(&BrokerNode::ioWorkerRun, this);
 }
 
 BrokerNode::~BrokerNode() {
-
+	this->running = false;
+	this->ioWorker.join();
 }
 
-void* BrokerNode::onClientConnect(TCPConnection& connection, void* serverState, const uint8 clientAddress[Net::Socket::ADDRESS_LENGTH]) {
-	return serverState;
-}
+void BrokerNode::ioWorkerRun() {
+	while (this->running) {
+		this->listLock.lock();
 
-void BrokerNode::onRequestReceived(TCPConnection& connection, void* state, TCPConnection::Message& message) {
-	BrokerNode& node = *reinterpret_cast<BrokerNode*>(state);
+		for (auto& i : this->clients) {
+			if (i.isDataAvailable()) {
+				for (auto& k : i.read()) {
+					if (!k.wasClosed) {
+						this->onMessage(i, k);
+					}
+					else {
+						if (i.state)
+							this->authenticated.erase(reinterpret_cast<ObjectId>(i.state));
 
-	if (message.wasClosed) {
-		for (auto i : node.servers) {
-			if (i.second == &connection) {
-				node.servers.erase(i.first);
-				return;
+					}
+				}
 			}
 		}
-	}
 
+		this->listLock.unlock();
+
+		this_thread::sleep_for(chrono::microseconds(500));
+	}
+}
+
+void BrokerNode::onClientConnect(Utilities::Net::TCPConnection&& client, void* state) {
+	BrokerNode& self = *reinterpret_cast<BrokerNode*>(state);
+	client.state = nullptr;
+	self.listLock.lock();
+	self.clients.push_back(std::move(client));
+	self.listLock.unlock();
+}
+
+void BrokerNode::onMessage(TCPConnection& connection, TCPConnection::Message& message) {
 	if (message.length < sizeof(ObjectId))
 		return;
 		
 	ObjectId targetId = reinterpret_cast<ObjectId*>(message.data)[0];
-
 	if (message.length == sizeof(ObjectId))
-		node.servers[targetId] = &connection;
+		this->authenticated[targetId] = &connection;
 	else
-		node.servers[targetId]->send(message.data + sizeof(ObjectId), message.length - sizeof(ObjectId));
+		this->authenticated[targetId]->send(message.data + sizeof(ObjectId), message.length - sizeof(ObjectId));
 }

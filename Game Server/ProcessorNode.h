@@ -37,10 +37,6 @@ namespace GameServer {
 			std::map<ObjectId, std::vector<Utilities::RequestServer::Client*>> authenticatedClients;
 			std::mutex clientsLock;
 			uint32 workers;
-			std::string brokerAddress;
-			std::string brokerPort;
-			std::string tcpPort;
-			std::string wsPort;
 			HandlerCreator handlerCreator;
 			ContextCreator contextCreator;
 			T** dbConnections;
@@ -53,13 +49,10 @@ namespace GameServer {
 				libconfig::Setting& settings = this->config.getRoot();
 
 				this->workers = static_cast<uint32>(settings["workerThreads"]);
-				this->tcpPort = std::string(settings["tcpServerPort"].c_str());
-				this->wsPort = std::string(settings["webSocketServerPort"].c_str());
-				this->brokerPort = std::string(settings["brokerPort"].c_str());
-				this->brokerAddress = std::string(settings["brokerAddress"].c_str());
 				this->handlerCreator = handlerCreator;
 				this->contextCreator = contextCreator;
 				this->requestServer = nullptr;
+				this->brokerNode = nullptr;
 				this->brokerClient = nullptr;
 				this->areaId = areaId;
 
@@ -70,10 +63,10 @@ namespace GameServer {
 				for (uint8 i = 0; i < this->workers; i++)
 					this->dbConnections[i] = this->contextCreator(this->dbParameters);
 
-				this->requestServer = new Utilities::RequestServer({ this->tcpPort, this->wsPort }, this->workers, { false, true }, IResultCode::RETRY_LATER, onRequest, onConnect, onDisconnect, this);
+				this->requestServer = new Utilities::RequestServer({ settings["tcpServerPort"].c_str(), settings["webSocketServerPort"].c_str() }, this->workers, { false, true }, IResultCode::RETRY_LATER, onRequest, onConnect, onDisconnect, this);
 
 				if (this->areaId != 0) {
-					this->brokerNode = new Utilities::Net::TCPConnection(this->brokerAddress, this->brokerPort, this);
+					this->brokerNode = new Utilities::Net::TCPConnection(settings["brokerAddress"].c_str(), settings["brokerPort"].c_str(), this);
 					this->brokerAsyncWorker.registerSocket(this->brokerNode->getBaseSocket(), this->brokerNode);
 					this->brokerAsyncWorker.start();
 					this->brokerClient = new Utilities::RequestServer::Client(*this->brokerNode, *this->requestServer, this->brokerNode->getBaseSocket().getRemoteAddress());
