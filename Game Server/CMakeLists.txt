@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8)
 project(GameServer)
 
-set(game_sources CacheProvider.cpp BrokerNode.cpp DBContext.cpp Objects.cpp)
+set(game_sources ICacheProvider.cpp BrokerNode.cpp IDBContext.cpp Objects.cpp)
 
 file(GLOB game_headers *.h)
 

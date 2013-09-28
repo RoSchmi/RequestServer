@@ -9,8 +9,13 @@
 
 namespace GameServer {
 	template<typename T> struct IDBCollection {
-		exported IDBCollection(const Utilities::SQLDatabase::Connection& contextConnection, std::string tableName) : dbConnection(contextConnection), tableBinding(tableName, true) { }
-		exported virtual ~IDBCollection() { };
+		exported IDBCollection(const Utilities::SQLDatabase::Connection& contextConnection, std::string tableName) : dbConnection(contextConnection), tableBinding(tableName, true) { 
+		
+		}
+
+		exported virtual ~IDBCollection() { 
+		
+		}
 
 		exported T getById(ObjectId id) {
 			return this->tableBinding.executeSelectById(this->dbConnection, id);
@@ -34,8 +39,13 @@ namespace GameServer {
 	};
 
 	template<typename T> struct ICachedCollection : public IDBCollection<T> {
-		exported ICachedCollection(const Utilities::SQLDatabase::Connection& contextConnection, ICacheProvider& contextCache, std::string tableName) : IDBCollection<T>(contextConnection, tableName), cache(contextCache) { }
-		exported virtual ~ICachedCollection() { };
+		exported ICachedCollection(const Utilities::SQLDatabase::Connection& contextConnection, ICacheProvider& contextCache, std::string tableName) : IDBCollection<T>(contextConnection, tableName), cache(contextCache) { 
+
+		}
+
+		exported virtual ~ICachedCollection() { 
+		
+		}
 
 		template<typename U> exported void load(std::string fieldName, U fieldValue) {
 			for (auto i : this->tableBinding.executeSelectManyByField(this->dbConnection, fieldName, fieldValue))
