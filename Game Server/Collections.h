@@ -9,7 +9,7 @@
 
 namespace GameServer {
 	template<typename T> struct IDBCollection {
-		exported IDBCollection(const Utilities::SQLDatabase::Connection& contextConnection, std::string tableName) : dbConnection(contextConnection), tableBinding(tableName, true) { 
+		exported IDBCollection(const Utilities::SQLDatabase::Connection& contextConnection, std::string tableName) : dbConnection(contextConnection), tableBinder(tableName, true) { 
 		
 		}
 
@@ -18,24 +18,24 @@ namespace GameServer {
 		}
 
 		exported T getById(ObjectId id) {
-			return this->tableBinding.executeSelectById(this->dbConnection, id);
+			return this->tableBinder.executeSelectById(this->dbConnection, id);
 		}
 
 		exported virtual void update(T& object) {
-			this->tableBinding.executeUpdate(this->dbConnection, object);
+			this->tableBinder.executeUpdate(this->dbConnection, object);
 		}
 
 		exported virtual void insert(T& object) {
-			this->tableBinding.executeInsert(this->dbConnection, object);
+			this->tableBinder.executeInsert(this->dbConnection, object);
 		}
 
 		exported virtual void remove(T& object) {
-			this->tableBinding.executeDelete(this->dbConnection, object);
+			this->tableBinder.executeDelete(this->dbConnection, object);
 		}
 
 		protected:
 			const Utilities::SQLDatabase::Connection& dbConnection;
-			Utilities::SQLDatabase::TableBinding<T> tableBinding;
+			Utilities::SQLDatabase::TableBinder<T> tableBinder;
 	};
 
 	template<typename T> struct ICachedCollection : public IDBCollection<T> {
@@ -48,7 +48,7 @@ namespace GameServer {
 		}
 
 		template<typename U> exported void load(std::string fieldName, U fieldValue) {
-			for (auto i : this->tableBinding.executeSelectManyByField(this->dbConnection, fieldName, fieldValue))
+			for (auto i : this->tableBinder.executeSelectManyByField(this->dbConnection, fieldName, fieldValue))
 				this->cache.add(new T(i));
 		}
 
