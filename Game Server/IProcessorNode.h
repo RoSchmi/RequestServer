@@ -19,8 +19,8 @@
 namespace GameServer {
 	class IProcessorNode {
 		public:
-			typedef std::shared_ptr<BaseHandler>(*HandlerCreator)(uint8 category, uint8 method, ObjectId& userId, std::shared_ptr<IDBContext>& db, uint16& errorCode, void* state);
-			typedef std::shared_ptr<IDBContext>(*ContextCreator)(Utilities::SQLDatabase::Connection::Parameters& parameters, void* state);
+			typedef std::shared_ptr<BaseHandler>(*HandlerCreator)(word workerNumber, uint8 category, uint8 method, ObjectId& userId, std::shared_ptr<IDBContext>& db, uint16& errorCode, void* state);
+			typedef std::shared_ptr<IDBContext>(*ContextCreator)(word workerNumber, Utilities::SQLDatabase::Connection::Parameters& parameters, void* state);
 
 			libconfig::Config config;
 

@@ -22,7 +22,7 @@ IProcessorNode::IProcessorNode(HandlerCreator handlerCreator, ContextCreator con
 
 	if (this->contextCreator)
 		for (word i = 0; i < this->workers; i++)
-			this->dbConnections[i] = this->contextCreator(this->dbParameters, this->state);
+			this->dbConnections[i] = this->contextCreator(i, this->dbParameters, this->state);
 
 		this->requestServer = RequestServer(vector<string> { settings["tcpServerPort"].c_str(), settings["webSocketServerPort"].c_str() }, vector<bool> { false, true }, this->workers, IResultCode::RETRY_LATER, IProcessorNode::onRequestDispatch, IProcessorNode::onConnectDispatch, IProcessorNode::onDisconnectDispatch, this);
 
@@ -90,7 +90,7 @@ RequestServer::RequestResult IProcessorNode::onRequest(TCPConnection& client, wo
 	ObjectId startId = authenticatedId;
 	auto& context = this->contextCreator ? this->dbConnections[workerNumber] : this->emptyDB;
 
-	auto handler = this->handlerCreator(requestCategory, requestMethod, authenticatedId, context, resultCode, this->state);
+	auto handler = this->handlerCreator(workerNumber, requestCategory, requestMethod, authenticatedId, context, resultCode, this->state);
 	if (!handler) {
 		resultCode = IResultCode::INVALID_REQUEST_TYPE;
 		goto end;
