@@ -3,6 +3,7 @@
 #include <string>
 
 #include <Utilities/SQLDatabase.h>
+#include <Utilities/TableBinder.h>
 
 #include "ICacheProvider.h"
 #include "Objects.h"
