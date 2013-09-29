@@ -85,8 +85,8 @@ IMapObject*& ICacheProvider::getByLocation(coord x, coord y) {
 	return this->locationIndex[this->width * static_cast<ObjectId>(y - this->startY) + static_cast<ObjectId>(x - this->startX)];
 }
 
-vector<IMapObject*> ICacheProvider::getInArea(coord x, coord y, size width, size height) {
-	vector<IMapObject*> result;
+unordered_set<IMapObject*> ICacheProvider::getInArea(coord x, coord y, size width, size height) {
+	unordered_set<IMapObject*> result;
 	coord endX = x + width;
 	coord endY = y + height;
 
@@ -95,9 +95,8 @@ vector<IMapObject*> ICacheProvider::getInArea(coord x, coord y, size width, size
 	for (; x < endX; x++) {
 		for (y = endY - height; y < endY; y++) {
 			IMapObject* current = this->getByLocation(x, y);
-			if (current && current->x == x && current->y == y) {
-				result[current->id] = current;
-			}
+			if (current)
+				result.insert(current);
 		}
 	}
 
@@ -150,11 +149,11 @@ const unordered_map<ObjectId, IObject*> ICacheProvider::getByOwner(OwnerId owner
 	return this->ownerIndex[ownerId];
 }
 
-vector<IMapObject*> ICacheProvider::getInOwnerLOS(OwnerId ownerId) {
+unordered_set<IMapObject*> ICacheProvider::getInOwnerLOS(OwnerId ownerId) {
 	unordered_map<ObjectId, IObject*> ownerObjects = this->ownerIndex[ownerId];
 	
 	coord startX, startY, endX, endY, x, y;
-	vector<IMapObject*> result;
+	unordered_set<IMapObject*> result;
 	for (auto i : ownerObjects) {
 		IMapObject* currentOwnerObject = dynamic_cast<IMapObject*>(i.second);
 		if (!currentOwnerObject) 
@@ -170,8 +169,8 @@ vector<IMapObject*> ICacheProvider::getInOwnerLOS(OwnerId ownerId) {
 		for (x = startX; x < endX; x++) {
 			for (y = startY; y < endY; y++) {
 				IMapObject* currentTestObject = this->getByLocation(x, y);
-				if (currentTestObject && currentTestObject->x == x && currentTestObject->y == y)
-					result.push_back(currentTestObject);
+				if (currentTestObject)
+					result.insert(currentTestObject);
 			}
 		}
 	}
@@ -179,8 +178,8 @@ vector<IMapObject*> ICacheProvider::getInOwnerLOS(OwnerId ownerId) {
 	return result;
 }
 
-vector<IMapObject*> ICacheProvider::getInOwnerLOS(OwnerId ownerId, coord x, coord y, size width, size height) {
-	vector<IMapObject*> result;
+unordered_set<IMapObject*> ICacheProvider::getInOwnerLOS(OwnerId ownerId, coord x, coord y, size width, size height) {
+	unordered_set<IMapObject*> result;
 
 	for (auto i : this->getInOwnerLOS(ownerId)) {
 		IMapObject* currentObject = dynamic_cast<IMapObject*>(i);
@@ -188,13 +187,13 @@ vector<IMapObject*> ICacheProvider::getInOwnerLOS(OwnerId ownerId, coord x, coor
 			continue;
 
 		if (currentObject->x >= x && currentObject->y >= y && currentObject->x <= x + width && currentObject->y <= y + height)
-			result[currentObject->id] = currentObject;
+			result.insert(currentObject);
 	}
 
 	return result;
 }
 
-std::unordered_set<ObjectId> ICacheProvider::getUsersWithLOSAt(coord x, coord y) {
+unordered_set<ObjectId> ICacheProvider::getUsersWithLOSAt(coord x, coord y) {
 	unordered_set<ObjectId> result;
 	coord endX = x + this->losRadius;
 	coord endY = y + this->losRadius;

@@ -18,7 +18,7 @@ IProcessorNode::IProcessorNode(HandlerCreator handlerCreator, ContextCreator con
 	this->state = state;
 
 	auto& dbSettings = settings["Database"];
-	this->dbParameters = { dbSettings["host"], dbSettings["port"], dbSettings["dbname"], dbSettings["role"], dbSettings["password"] };
+	this->dbParameters = { dbSettings["host"].c_str(), dbSettings["port"].c_str(), dbSettings["dbname"].c_str(), dbSettings["role"].c_str(), dbSettings["password"].c_str() };
 
 	if (this->contextCreator)
 		for (word i = 0; i < this->workers; i++)

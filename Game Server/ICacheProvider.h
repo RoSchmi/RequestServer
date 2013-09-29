@@ -2,7 +2,6 @@
 
 #include <unordered_map>
 #include <unordered_set>
-#include <vector>
 
 #include <Utilities/Common.h>
 #include <Utilities/SQLDatabase.h>
@@ -41,12 +40,12 @@ namespace GameServer {
 
 			exported Objects::IMapObject*& getByLocation(coord x, coord y);
 			exported Objects::IObject* getById(ObjectId searchId);
-			exported std::vector<Objects::IMapObject*> getInArea(coord x, coord y, size width = 1, size height = 1);
+			exported std::unordered_set<Objects::IMapObject*> getInArea(coord x, coord y, size width = 1, size height = 1);
 			exported std::unordered_set<ObjectId> getUsersWithLOSAt(coord x, coord y);
 
 			exported const std::unordered_map<ObjectId, Objects::IObject*> getByOwner(OwnerId ownerId);
-			exported std::vector<Objects::IMapObject*> getInOwnerLOS(OwnerId ownerId);
-			exported std::vector<Objects::IMapObject*> getInOwnerLOS(OwnerId ownerId, coord x, coord y, size width, size height);
+			exported std::unordered_set<Objects::IMapObject*> getInOwnerLOS(OwnerId ownerId);
+			exported std::unordered_set<Objects::IMapObject*> getInOwnerLOS(OwnerId ownerId, coord x, coord y, size width, size height);
 
 			exported bool isAreaEmpty(coord x, coord y, size width = 1, size height = 1);
 			exported bool isLocationInLOS(coord x, coord y, OwnerId ownerId);
