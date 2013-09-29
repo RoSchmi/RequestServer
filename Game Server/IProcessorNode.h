@@ -22,9 +22,7 @@ namespace GameServer {
 			typedef std::shared_ptr<BaseHandler>(*HandlerCreator)(word workerNumber, uint8 category, uint8 method, ObjectId& userId, std::shared_ptr<IDBContext>& db, uint16& errorCode, void* state);
 			typedef std::shared_ptr<IDBContext>(*ContextCreator)(word workerNumber, Utilities::SQLDatabase::Connection::Parameters& parameters, void* state);
 
-			libconfig::Config config;
-
-			exported IProcessorNode(HandlerCreator handlerCreator, ContextCreator contextCreator, std::string configFileName, ObjectId areaId, void* state = nullptr);
+			exported IProcessorNode(HandlerCreator handlerCreator, ContextCreator contextCreator, libconfig::Setting& settings, ObjectId areaId, void* state = nullptr);
 			exported virtual ~IProcessorNode();
 
 			exported void sendMessage(ObjectId receipientUserId, Utilities::DataStream&& notification);

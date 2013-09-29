@@ -7,10 +7,7 @@ using namespace Utilities;
 using namespace Utilities::Net;
 using namespace GameServer;
 
-IProcessorNode::IProcessorNode(HandlerCreator handlerCreator, ContextCreator contextCreator, string configFileName, ObjectId areaId, void* state) {
-	this->config.readFile(configFileName.c_str());
-	auto& settings = this->config.getRoot();
-
+IProcessorNode::IProcessorNode(HandlerCreator handlerCreator, ContextCreator contextCreator, libconfig::Setting& settings, ObjectId areaId, void* state) {
 	this->workers = settings["workerThreads"];
 	this->handlerCreator = handlerCreator;
 	this->contextCreator = contextCreator;

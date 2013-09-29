@@ -10,7 +10,7 @@ using namespace Utilities;
 using namespace Utilities::Net;
 using namespace GameServer;
 
-BrokerNode::BrokerNode(std::string configFileName) : IProcessorNode(nullptr, nullptr, configFileName, 0) {
+BrokerNode::BrokerNode(libconfig::Setting& settings) : IProcessorNode(nullptr, nullptr, settings, 0) {
 
 }
 

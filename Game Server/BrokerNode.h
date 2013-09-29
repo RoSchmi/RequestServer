@@ -11,7 +11,7 @@ namespace GameServer {
 		virtual Utilities::Net::RequestServer::RequestResult onRequest(Utilities::Net::TCPConnection& client, word workerNumber, uint8 requestCategory, uint8 requestMethod, Utilities::DataStream& parameters, Utilities::DataStream& response) override;
 
 	public:
-		exported BrokerNode(std::string configFileName);
+		exported BrokerNode(libconfig::Setting& settings);
 		exported virtual ~BrokerNode();
 	};
 }
