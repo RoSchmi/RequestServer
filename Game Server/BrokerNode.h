@@ -1,30 +1,17 @@
 #pragma once
 
-#include <map>
-#include <atomic>
-#include <thread>
-#include <mutex>
+#include <Utilities/DataStream.h>
+#include <Utilities/TCPConnection.h>
 
-#include <Utilities/TCPServer.h>
-
-#include "Common.h"
+#include "IProcessorNode.h"
 
 namespace GameServer {
-	class BrokerNode {
-		std::vector<Utilities::Net::TCPConnection> clients;
-		std::map<ObjectId, Utilities::Net::TCPConnection*> authenticated;
-		Utilities::Net::TCPServer server;
-		std::atomic<bool> running;
-		std::thread ioWorker;
-		std::mutex listLock;
-		
-		static void onClientConnect(Utilities::Net::TCPConnection&& client, void* state);
+	class BrokerNode : public IProcessorNode {
+		virtual void onDisconnect(Utilities::Net::TCPConnection& client) override;
+		virtual Utilities::Net::RequestServer::RequestResult onRequest(Utilities::Net::TCPConnection& client, word workerNumber, uint8 requestCategory, uint8 requestMethod, Utilities::DataStream& parameters, Utilities::DataStream& response) override;
 
-		void ioWorkerRun();
-		void onMessage(Utilities::Net::TCPConnection& connection, Utilities::Net::TCPConnection::Message& message);
-
-		public:
-			exported BrokerNode(cstr port);
-			exported ~BrokerNode();
+	public:
+		exported BrokerNode(std::string configFileName);
+		exported virtual ~BrokerNode();
 	};
 }
