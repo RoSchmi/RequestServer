@@ -17,13 +17,6 @@
 #include "Common.h"
 
 namespace GameServer {
-	class BaseHandler {
-		public:
-			exported virtual ResultCode process() = 0;
-			exported virtual void deserialize(Utilities::DataStream& parameters) = 0;
-			exported virtual void serialize(Utilities::DataStream& response) = 0;
-	};
-
 	class IProcessorNode {
 		public:
 			typedef std::shared_ptr<BaseHandler>(*HandlerCreator)(uint8 category, uint8 method, ObjectId& userId, std::shared_ptr<IDBContext>& db, uint16& errorCode, void* state);

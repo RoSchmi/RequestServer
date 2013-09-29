@@ -9,6 +9,13 @@ namespace GameServer {
 	typedef float64 coord;
 	typedef uint32 size;
 
+	class BaseHandler {
+		public:
+			exported virtual ResultCode process() = 0;
+			exported virtual void deserialize(Utilities::DataStream& parameters) = 0;
+			exported virtual void serialize(Utilities::DataStream& response) = 0;
+	};
+
 	class IResultCode {
 		public:
 			static const ResultCode SUCCESS = 0;
