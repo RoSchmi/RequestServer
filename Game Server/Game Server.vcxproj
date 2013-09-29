@@ -14,12 +14,12 @@
     <ClCompile Include="Objects.cpp" />
     <ClCompile Include="ICacheProvider.cpp" />
     <ClCompile Include="IDBContext.cpp" />
-    <ClCompile Include="ProcessorNode.cpp" />
+    <ClCompile Include="IProcessorNode.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BrokerNode.h" />
     <ClInclude Include="Common.h" />
-    <ClInclude Include="ProcessorNode.h" />
+    <ClInclude Include="IProcessorNode.h" />
     <ClInclude Include="Objects.h" />
     <ClInclude Include="Collections.h" />
     <ClInclude Include="ICacheProvider.h" />
