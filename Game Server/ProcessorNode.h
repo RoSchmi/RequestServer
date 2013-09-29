@@ -49,6 +49,7 @@ namespace GameServer {
 			word workers;
 			HandlerCreator handlerCreator;
 			ContextCreator contextCreator;
+			std::unique_ptr<IDBContext> emptyDB;
 			std::vector<std::unique_ptr<IDBContext>> dbConnections;
 
 			static void onConnect(Utilities::Net::TCPConnection& client, void* state);

@@ -9,10 +9,6 @@
 
 #include "Common.h"
 
-using namespace std;
-using namespace Utilities;
-using namespace Utilities::Net;
-
 namespace GameServer {
 	class BrokerNode {
 		std::vector<Utilities::Net::TCPConnection> clients;

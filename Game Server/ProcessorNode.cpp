@@ -19,8 +19,9 @@ ProcessorNode::ProcessorNode(HandlerCreator handlerCreator, ContextCreator conte
 	auto& dbSettings = settings["Database"];
 	this->dbParameters = { dbSettings["host"], dbSettings["port"], dbSettings["dbname"], dbSettings["role"], dbSettings["password"] };
 
-	for (word i = 0; i < this->workers; i++)
-		this->dbConnections[i] = this->contextCreator(this->dbParameters);
+	if (this->contextCreator)
+		for (word i = 0; i < this->workers; i++)
+			this->dbConnections[i] = this->contextCreator(this->dbParameters);
 
 	this->requestServer = RequestServer(vector<string> { settings["tcpServerPort"].c_str(), settings["webSocketServerPort"].c_str() }, vector<bool> { false, true }, this->workers, IResultCode::RETRY_LATER, ProcessorNode::onRequest, nullptr, ProcessorNode::onDisconnect, this);
 
@@ -90,7 +91,7 @@ RequestServer::RequestResult ProcessorNode::onRequest(TCPConnection& client, voi
 	ResultCode resultCode = IResultCode::SUCCESS;
 	ObjectId authenticatedId = reinterpret_cast<ObjectId>(client.state);
 	ObjectId startId = authenticatedId;
-	auto& context = node.dbConnections[workerNumber];
+	auto& context = node.contextCreator ? node.dbConnections[workerNumber] : node.emptyDB;
 
 	auto handler = node.handlerCreator(requestCategory, requestMethod, authenticatedId, context, resultCode);
 	if (!handler) {
@@ -106,15 +107,21 @@ RequestServer::RequestResult ProcessorNode::onRequest(TCPConnection& client, voi
 		goto end;
 	}
 
-	context->beginTransaction();
-	resultCode = handler->process();
-	try {
-		context->commitTransaction();
+	if (node.contextCreator) {
+		context->beginTransaction();
+		resultCode = handler->process();
+		try {
+			context->commitTransaction();
+		}
+		catch (const SQLDatabase::Exception&) {
+			context->rollbackTransaction();
+			return RequestServer::RequestResult::RETRY_LATER;
+		}
 	}
-	catch (const SQLDatabase::Exception&) {
-		context->rollbackTransaction();
-		return RequestServer::RequestResult::RETRY_LATER;
+	else {
+		resultCode = handler->process();
 	}
+
 
 	if (resultCode == IResultCode::NO_RESPONSE)
 		return RequestServer::RequestResult::NO_RESPONSE;
