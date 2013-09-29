@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Utilities/Common.h>
+#include <Utilities/DataStream.h>
 
 namespace GameServer {
 	typedef uint16 ResultCode;
