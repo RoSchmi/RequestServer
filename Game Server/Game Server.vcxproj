@@ -14,6 +14,7 @@
     <ClCompile Include="Objects.cpp" />
     <ClCompile Include="ICacheProvider.cpp" />
     <ClCompile Include="IDBContext.cpp" />
+    <ClCompile Include="ProcessorNode.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BrokerNode.h" />

@@ -23,5 +23,6 @@ namespace GameServer {
 			static const ResultCode NOT_IN_LOS = 9;
 			static const ResultCode LOCATION_OCCUPIED = 10;
 			static const ResultCode INVALID_LOCATION = 11;
+			static const ResultCode NO_RESPONSE = 12;
 	};
 }

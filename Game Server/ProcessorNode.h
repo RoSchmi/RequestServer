@@ -1,12 +1,10 @@
 #pragma once
 
-#include <iostream>
-#include <cstring>
 #include <string>
 #include <mutex>
 #include <map>
+#include <memory>
 #include <vector>
-#include <algorithm>
 
 #include <libconfig.h++>
 
@@ -14,194 +12,47 @@
 #include <Utilities/SQLDatabase.h>
 #include <Utilities/RequestServer.h>
 #include <Utilities/TCPConnection.h>
-#include <Utilities/Socket.h>
 
-#include "BaseMessages.h"
-#include "DBContext.h"
-
+#include "IDBContext.h"
 #include "Common.h"
 
 namespace GameServer {
-	template<typename T> class BaseRequest {
+	class BaseHandler {
 		public:
-			exported virtual ResultCode process(ObjectId& userId, T& db) = 0;
+			exported virtual ResultCode process() = 0;
 			exported virtual void deserialize(Utilities::DataStream& parameters) = 0;
 			exported virtual void serialize(Utilities::DataStream& response) = 0;
 	};
 
-	template<typename T> class NodeInstance {
+	class ProcessorNode {
 		public:
-			typedef BaseRequest<T>* (*HandlerCreator)(uint8 category, uint8 method, uint64 userId, uint16& errorCode);
-			typedef T* (*ContextCreator)(Utilities::SQLDatabase::Connection::Parameters& parameters);
+			typedef std::unique_ptr<BaseHandler> (*HandlerCreator)(uint8 category, uint8 method, ObjectId& userId, std::unique_ptr<IDBContext>& db, uint16& errorCode);
+			typedef std::unique_ptr<IDBContext>(*ContextCreator)(Utilities::SQLDatabase::Connection::Parameters& parameters);
 
-		private:
-			Utilities::RequestServer* requestServer;
-			Utilities::SQLDatabase::Connection::Parameters dbParameters;
-			Utilities::Net::TCPConnection* brokerNode;
-			Utilities::Net::SocketAsyncWorker brokerAsyncWorker;
-			Utilities::RequestServer::Client* brokerClient;
-			ObjectId areaId;
-			std::map<ObjectId, std::vector<Utilities::RequestServer::Client*>> authenticatedClients;
-			std::mutex clientsLock;
-			uint32 workers;
-			HandlerCreator handlerCreator;
-			ContextCreator contextCreator;
-			T** dbConnections;
-
-		public:
 			libconfig::Config config;
 
-			exported NodeInstance(HandlerCreator handlerCreator, ContextCreator contextCreator, std::string configFileName, ObjectId areaId) : brokerAsyncWorker(NodeInstance::onBrokerReceived) {
-				this->config.readFile(configFileName.c_str());
-				libconfig::Setting& settings = this->config.getRoot();
+			exported ProcessorNode(HandlerCreator handlerCreator, ContextCreator contextCreator, std::string configFileName, ObjectId areaId);
+			exported ~ProcessorNode();
 
-				this->workers = static_cast<uint32>(settings["workerThreads"]);
-				this->handlerCreator = handlerCreator;
-				this->contextCreator = contextCreator;
-				this->requestServer = nullptr;
-				this->brokerNode = nullptr;
-				this->brokerClient = nullptr;
-				this->areaId = areaId;
-
-				const libconfig::Setting& dbSettings = settings["Database"];
-				this->dbParameters = { dbSettings["host"].c_str(), dbSettings["port"].c_str(), dbSettings["dbname"].c_str(), dbSettings["role"].c_str(), dbSettings["password"].c_str() };
-
-				this->dbConnections = new T*[this->workers];
-				for (uint8 i = 0; i < this->workers; i++)
-					this->dbConnections[i] = this->contextCreator(this->dbParameters);
-
-				this->requestServer = new Utilities::RequestServer({ settings["tcpServerPort"].c_str(), settings["webSocketServerPort"].c_str() }, this->workers, { false, true }, IResultCode::RETRY_LATER, onRequest, onConnect, onDisconnect, this);
-
-				if (this->areaId != 0) {
-					this->brokerNode = new Utilities::Net::TCPConnection(settings["brokerAddress"].c_str(), settings["brokerPort"].c_str(), this);
-					this->brokerAsyncWorker.registerSocket(this->brokerNode->getBaseSocket(), this->brokerNode);
-					this->brokerAsyncWorker.start();
-					this->brokerClient = new Utilities::RequestServer::Client(*this->brokerNode, *this->requestServer, this->brokerNode->getBaseSocket().getRemoteAddress());
-					this->brokerNode->send(reinterpret_cast<uint8*>(&this->areaId), sizeof(ObjectId));
-				}
-			}
-
-			exported ~NodeInstance(){
-				for (uint8 i = 0; i < this->workers; i++)
-					delete this->dbConnections[i];
-
-				delete[] this->dbConnections;
-
-				delete this->requestServer;
-
-				if (this->brokerClient)
-					delete this->brokerClient;
-			}
-
-			exported Utilities::DataStream getNewMessage(uint16 messageId, uint8 category, uint8 type) {
-				Utilities::DataStream stream;
-				Utilities::RequestServer::Message::getHeader(stream, messageId, category, type);
-				return stream;
-			}
-
-			exported void sendNotification(ObjectId receipientUserId, Utilities::DataStream& stream) {
-				this->clientsLock.lock();
-
-				auto iter = this->authenticatedClients.find(receipientUserId);
-				if (iter != this->authenticatedClients.end()) {
-					for (auto i : iter->second) {
-						auto message = new Utilities::RequestServer::Message(*i, stream);
-						this->requestServer->addToOutgoingQueue(message);
-					}
-				}
-
-				this->clientsLock.unlock();
-			}
-
-			exported void sendToBroker(ObjectId recepientAreaId, Utilities::DataStream& stream) {
-				this->brokerNode->addPart(reinterpret_cast<uint8*>(&recepientAreaId), sizeof(ObjectId));
-				this->brokerNode->addPart(stream.getBuffer(), stream.getLength());
-				this->brokerNode->sendParts();
-			}
+			exported void sendNotification(ObjectId receipientUserId, Utilities::DataStream&& notification);
+			exported void sendMessageToBroker(Utilities::DataStream&& message);
+			exported Utilities::DataStream createNotification(uint8 category, uint8 type);
+			exported Utilities::DataStream ProcessorNode::createBrokerMessage(ObjectId targetAreaId, uint8 category, uint8 type);
 
 		private:
-			static void onBrokerReceived(const Utilities::Net::Socket& socket, void* state) {
-				auto& connection = *static_cast<Utilities::Net::TCPConnection*>(state);
-				NodeInstance& node = *static_cast<NodeInstance*>(connection.getState());
-				auto messages = connection.read(0);
+			Utilities::SQLDatabase::Connection::Parameters dbParameters;
+			Utilities::Net::RequestServer requestServer;
+			ObjectId areaId;
+			Utilities::Net::TCPConnection* brokerNode;
+			std::map<ObjectId, std::vector<Utilities::Net::TCPConnection*>> authenticatedClients;
+			std::mutex clientsLock;
+			word workers;
+			HandlerCreator handlerCreator;
+			ContextCreator contextCreator;
+			std::vector<std::unique_ptr<IDBContext>> dbConnections;
 
-				if (messages.getCount() == 0)
-					return;
-
-				for (auto& i : messages) {
-					Utilities::DataStream stream(i.data, i.length);
-					node.requestServer->addToIncomingQueue(new Utilities::RequestServer::Message(*node.brokerClient, stream));
-				}
-			}
-
-			static void* onConnect(Utilities::RequestServer::Client& client, void* state) {
-				return nullptr;
-			}
-
-			static void onDisconnect(Utilities::RequestServer::Client& client, void* state) {
-				NodeInstance& node = *static_cast<NodeInstance*>(state);
-				ObjectId authenticatedId = reinterpret_cast<ObjectId>(client.state);
-				
-				node.clientsLock.lock();
-
-				auto i = node.authenticatedClients.find(authenticatedId);
-				if (i != node.authenticatedClients.end()) {
-					auto& list = i->second;
-					auto j = std::find(list.begin(), list.end(), &client);
-
-					list.erase(j);
-
-					if (list.size() == 0)
-						node.authenticatedClients.erase(authenticatedId);
-				}
-
-				node.clientsLock.unlock();
-			}
-
-			static bool onRequest(uint8 workerNumber, Utilities::RequestServer::Client& client, uint8 requestCategory, uint8 requestMethod, Utilities::DataStream& parameters, Utilities::DataStream& response, void* state) {
-				NodeInstance& node = *static_cast<NodeInstance*>(state);
-				ResultCode resultCode = IResultCode::SUCCESS;
-				T& context = *node.dbConnections[workerNumber];
-				ObjectId authenticatedId = reinterpret_cast<ObjectId>(client.state);
-				ObjectId startId = authenticatedId;
-
-				auto handler = node.handlerCreator(requestCategory, requestMethod, authenticatedId, resultCode);
-				if (!handler)
-					goto end;
-
-				try {
-					handler->deserialize(parameters);
-				}
-				catch (Utilities::DataStream::ReadPastEndException&) {
-					resultCode = IResultCode::SERVER_ERROR;
-					goto end;
-				}
-	
-				context.beginTransaction();
-				resultCode = handler->process(authenticatedId, context);
-				try {
-					context.commitTransaction();
-				} catch (const Utilities::SQLDatabase::Exception&) {
-					context.rollbackTransaction();
-					resultCode = IResultCode::SERVER_ERROR;
-				}
-
-			end:
-				response.write(resultCode);
-				if (resultCode == IResultCode::SUCCESS)
-					handler->serialize(response);
-
-				//It is invalid to change the authenticated id more than once per session.
-				if (authenticatedId != startId) {
-					node.clientsLock.lock();
-					node.authenticatedClients[authenticatedId].push_back(&client);
-					node.clientsLock.unlock();
-					client.state = reinterpret_cast<void*>(authenticatedId);
-				}
-
-				delete handler;
-
-				return true;
-			}
+			static void onConnect(Utilities::Net::TCPConnection& client, void* state);
+			static void onDisconnect(Utilities::Net::TCPConnection& client, void* state);
+			static Utilities::Net::RequestServer::RequestResult onRequest(Utilities::Net::TCPConnection& client, void* state, word workerNumber, uint8 requestCategory, uint8 requestMethod, Utilities::DataStream& parameters, Utilities::DataStream& response);
 	};
 }

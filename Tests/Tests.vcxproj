@@ -9,7 +9,7 @@
   </ItemGroup>
   <ItemDefinitionGroup>
     <Link>
-      <AdditionalDependencies>Game Server\Game Server.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Game Server\Game Server.lib;Utilities\Utilities.lib;Ws2_32.lib;libpq\libpq.lib;libconfig\libconfig.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
 </Project>
