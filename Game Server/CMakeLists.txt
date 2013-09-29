@@ -5,9 +5,11 @@ set(game_sources ICacheProvider.cpp BrokerNode.cpp IDBContext.cpp Objects.cpp)
 
 file(GLOB game_headers *.h)
 
-add_library(GameServer SHARED ${game_sources})
+add_library(GameServerObjects OBJECT ${game_sources})
+add_library(GameServer SHARED $<TARGET_OBJECTS:GameServerObjects>)
+add_library(GameServerStatic STATIC $<TARGET_OBJECTS:GameServerObjects>)
 
-set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -pedantic -Wno-overloaded-virtual ${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "-std=c++11 -fPIC -Wall -pedantic -Wno-overloaded-virtual ${CMAKE_CXX_FLAGS}")
 
 find_package(Threads REQUIRED)
 find_package(PostgreSQL REQUIRED)
