@@ -3,8 +3,8 @@
 #include <algorithm>
 
 using namespace std;
-using namespace Utilities;
-using namespace Utilities::Net;
+using namespace util;
+using namespace util::net;
 using namespace GameServer;
 
 IProcessorNode::IProcessorNode(HandlerCreator handlerCreator, ContextCreator contextCreator, libconfig::Setting& settings, ObjectId areaId, void* state) {
@@ -21,12 +21,12 @@ IProcessorNode::IProcessorNode(HandlerCreator handlerCreator, ContextCreator con
 		for (word i = 0; i < this->workers; i++)
 			this->dbConnections[i] = this->contextCreator(i, this->dbParameters, this->state);
 
-		this->requestServer = RequestServer(vector<string> { settings["tcpServerPort"].c_str(), settings["webSocketServerPort"].c_str() }, vector<bool> { false, true }, this->workers, IResultCode::RETRY_LATER, IProcessorNode::onRequestDispatch, IProcessorNode::onConnectDispatch, IProcessorNode::onDisconnectDispatch, this);
+		this->requestServer = request_server(vector<string> { settings["tcpServerPort"].c_str(), settings["webSocketServerPort"].c_str() }, vector<bool> { false, true }, this->workers, IResultCode::RETRY_LATER, IProcessorNode::onRequestDispatch, IProcessorNode::onConnectDispatch, IProcessorNode::onDisconnectDispatch, this);
 
 	if (this->areaId != 0) {
-		TCPConnection brokerNode(settings["brokerAddress"].c_str(), settings["brokerPort"].c_str(), this);
+		tcp_connection brokerNode(settings["brokerAddress"].c_str(), settings["brokerPort"].c_str(), this);
 		brokerNode.state = reinterpret_cast<void*>(this->areaId);
-		this->brokerNode = &this->requestServer.adoptConnection(std::move(brokerNode));
+		this->brokerNode = &this->requestServer.adopt(std::move(brokerNode));
 		this->authenticatedClients[this->areaId].push_back(this->brokerNode);
 		this->sendMessageToBroker(this->areaId, this->createMessage(0x00, 0x00));
 	}
@@ -36,33 +36,33 @@ IProcessorNode::~IProcessorNode() {
 
 }
 
-void IProcessorNode::sendMessage(ObjectId receipientUserId, DataStream&& notification) {
+void IProcessorNode::sendMessage(ObjectId receipientUserId, data_stream&& notification) {
 	this->clientsLock.lock();
 
 	auto iter = this->authenticatedClients.find(receipientUserId);
 	if (iter != this->authenticatedClients.end())
 		for (auto i : iter->second)
-			this->requestServer.addToOutgoingQueue(RequestServer::Message(*i, std::move(notification)));
+			this->requestServer.enqueue_outgoing(request_server::message(*i, std::move(notification)));
 
 	this->clientsLock.unlock();
 }
 
-void IProcessorNode::sendMessageToBroker(ObjectId targetAreaId, DataStream&& message) {
+void IProcessorNode::sendMessageToBroker(ObjectId targetAreaId, data_stream&& message) {
 	message.write(targetAreaId);
-	this->requestServer.addToOutgoingQueue(RequestServer::Message(*this->brokerNode, std::move(message)));
+	this->requestServer.enqueue_outgoing(request_server::message(*this->brokerNode, std::move(message)));
 }
 
-DataStream IProcessorNode::createMessage(uint8 category, uint8 type) {
-	DataStream notification;
-	RequestServer::Message::writeHeader(notification, 0x00, category, type);
+data_stream IProcessorNode::createMessage(uint8 category, uint8 type) {
+	data_stream notification;
+	request_server::message::write_header(notification, 0x00, category, type);
 	return notification;
 }
 
-void IProcessorNode::onConnect(TCPConnection& client) {
+void IProcessorNode::onConnect(tcp_connection& client) {
 
 }
 
-void IProcessorNode::onDisconnect(TCPConnection& client) {
+void IProcessorNode::onDisconnect(tcp_connection& client) {
 	ObjectId authenticatedId = reinterpret_cast<ObjectId>(client.state);
 
 	this->clientsLock.lock();
@@ -81,7 +81,7 @@ void IProcessorNode::onDisconnect(TCPConnection& client) {
 	this->clientsLock.unlock();
 }
 
-RequestServer::RequestResult IProcessorNode::onRequest(TCPConnection& client, word workerNumber, uint8 requestCategory, uint8 requestMethod, DataStream& parameters, DataStream& response) {
+request_server::request_result IProcessorNode::onRequest(tcp_connection& client, word workerNumber, uint8 requestCategory, uint8 requestMethod, data_stream& parameters, data_stream& response) {
 	ResultCode resultCode = IResultCode::SUCCESS;
 	ObjectId authenticatedId = reinterpret_cast<ObjectId>(client.state);
 	ObjectId startId = authenticatedId;
@@ -96,7 +96,7 @@ RequestServer::RequestResult IProcessorNode::onRequest(TCPConnection& client, wo
 	try {
 		handler->deserialize(parameters);
 	}
-	catch (DataStream::ReadPastEndException&) {
+	catch (data_stream::read_past_end_exception&) {
 		resultCode = IResultCode::INVALID_PARAMETERS;
 		goto end;
 	}
@@ -107,18 +107,17 @@ RequestServer::RequestResult IProcessorNode::onRequest(TCPConnection& client, wo
 		try {
 			context->commitTransaction();
 		}
-		catch (const SQLDatabase::Exception&) {
+		catch (const sql::db_exception&) {
 			context->rollbackTransaction();
-			return RequestServer::RequestResult::RETRY_LATER;
+			return request_server::request_result::RETRY_LATER;
 		}
 	}
 	else {
 		resultCode = handler->process();
 	}
 
-
 	if (resultCode == IResultCode::NO_RESPONSE)
-		return RequestServer::RequestResult::NO_RESPONSE;
+		return request_server::request_result::NO_RESPONSE;
 
 	if (authenticatedId != startId) {
 		this->clientsLock.lock();
@@ -133,17 +132,17 @@ end:
 	if (resultCode == IResultCode::SUCCESS)
 		handler->serialize(response);
 
-	return RequestServer::RequestResult::SUCCESS;
+	return request_server::request_result::SUCCESS;
 }
 
-RequestServer::RequestResult IProcessorNode::onRequestDispatch(TCPConnection& client, void* state, word workerNumber, uint8 requestCategory, uint8 requestMethod, DataStream& parameters, DataStream& response) {
+request_server::request_result IProcessorNode::onRequestDispatch(tcp_connection& client, void* state, word workerNumber, uint8 requestCategory, uint8 requestMethod, data_stream& parameters, data_stream& response) {
 	return reinterpret_cast<IProcessorNode*>(state)->onRequest(client, workerNumber, requestCategory, requestMethod, parameters, response);
 }
 
-void IProcessorNode::onDisconnectDispatch(TCPConnection& client, void* state) {
+void IProcessorNode::onDisconnectDispatch(tcp_connection& client, void* state) {
 	reinterpret_cast<IProcessorNode*>(state)->onDisconnect(client);
 }
 
-void IProcessorNode::onConnectDispatch(TCPConnection& client, void* state) {
+void IProcessorNode::onConnectDispatch(tcp_connection& client, void* state) {
 	reinterpret_cast<IProcessorNode*>(state)->onConnect(client);
 }

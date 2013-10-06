@@ -11,9 +11,9 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="BrokerNode.cpp" />
+    <ClCompile Include="IDBContext.cpp" />
     <ClCompile Include="Objects.cpp" />
     <ClCompile Include="ICacheProvider.cpp" />
-    <ClCompile Include="IDBContext.cpp" />
     <ClCompile Include="IProcessorNode.cpp" />
   </ItemGroup>
   <ItemGroup>

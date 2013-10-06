@@ -2,15 +2,15 @@
 
 #include <string>
 
-#include <Utilities/SQLDatabase.h>
-#include <Utilities/TableBinder.h>
+#include <Utilities/SQL/Database.h>
+#include <Utilities/SQL/TableBinder.h>
 
 #include "ICacheProvider.h"
 #include "Objects.h"
 
 namespace GameServer {
 	template<typename T> struct IDBCollection {
-		exported IDBCollection(const Utilities::SQLDatabase::Connection& contextConnection, std::string tableName) : dbConnection(contextConnection), tableBinder(tableName, true) { 
+		exported IDBCollection(const util::sql::connection& contextConnection, std::string tableName) : dbConnection(contextConnection), tableBinder(tableName, true) { 
 		
 		}
 
@@ -35,12 +35,12 @@ namespace GameServer {
 		}
 
 		protected:
-			const Utilities::SQLDatabase::Connection& dbConnection;
-			Utilities::SQLDatabase::TableBinder<T> tableBinder;
+			const util::sql::connection& dbConnection;
+			util::sql::table_binder<T> tableBinder;
 	};
 
 	template<typename T> struct ICachedCollection : public IDBCollection<T> {
-		exported ICachedCollection(const Utilities::SQLDatabase::Connection& contextConnection, ICacheProvider& contextCache, std::string tableName) : IDBCollection<T>(contextConnection, tableName), cache(contextCache) { 
+		exported ICachedCollection(const util::sql::connection& contextConnection, ICacheProvider& contextCache, std::string tableName) : IDBCollection<T>(contextConnection, tableName), cache(contextCache) { 
 
 		}
 

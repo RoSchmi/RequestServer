@@ -4,7 +4,7 @@
 #include <unordered_set>
 
 #include <Utilities/Common.h>
-#include <Utilities/SQLDatabase.h>
+#include <Utilities/SQL/Database.h>
 
 #include "Objects.h"
 

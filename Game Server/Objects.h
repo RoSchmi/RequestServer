@@ -2,13 +2,13 @@
 
 #include <string>
 
-#include <Utilities/SQLDatabase.h>
+#include <Utilities/SQL/Database.h>
 
 #include "Common.h"
 
 namespace GameServer {
 	namespace Objects {
-		struct IObject : public Utilities::SQLDatabase::IDBObject  {
+		struct IObject : public util::sql::db_object<uint64>  {
 			exported IObject(uint8 objectType);
 			exported virtual ~IObject();
 

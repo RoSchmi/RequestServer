@@ -13,8 +13,8 @@ namespace GameServer {
 	class BaseHandler {
 		public:
 			exported virtual ResultCode process() = 0;
-			exported virtual void deserialize(Utilities::DataStream& parameters) = 0;
-			exported virtual void serialize(Utilities::DataStream& response) = 0;
+			exported virtual void deserialize(util::data_stream& parameters) = 0;
+			exported virtual void serialize(util::data_stream& response) = 0;
 	};
 
 	class IResultCode {

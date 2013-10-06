@@ -4,8 +4,8 @@
 #include <cstring>
 
 using namespace std;
-using namespace Utilities;
-using namespace Utilities::SQLDatabase;
+using namespace util;
+using namespace util::sql;
 using namespace GameServer;
 using namespace Objects;
 

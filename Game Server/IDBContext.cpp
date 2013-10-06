@@ -3,11 +3,11 @@
 #include <stdexcept>
 
 using namespace std;
-using namespace Utilities;
-using namespace Utilities::SQLDatabase;
+using namespace util;
+using namespace util::sql;
 using namespace GameServer;
 
-IDBContext::IDBContext(const Connection::Parameters& connectionParameters) : connection(connectionParameters) {
+IDBContext::IDBContext(const util::sql::connection::parameters& connectionParameters) : conn(connectionParameters) {
 	this->nextId = 0;
 	this->endOfIssuedIdBlock = 0;
 	this->transactionCommitted = true;
@@ -17,15 +17,11 @@ IDBContext::IDBContext(const Connection::Parameters& connectionParameters) : con
 	this->nextId--;
 }
 
-IDBContext::~IDBContext() {
-
-}
-
 void IDBContext::beginTransaction() {
 	if (!this->transactionCommitted)
 		throw runtime_error("Transaction already begun.");
 
-	this->connection.newQuery("START TRANSACTION ISOLATION LEVEL REPEATABLE READ;").execute();
+	this->conn.new_query("START TRANSACTION ISOLATION LEVEL REPEATABLE READ;").execute();
 	this->transactionCommitted = false;
 }
 
@@ -33,7 +29,7 @@ void IDBContext::commitTransaction() {
 	if (this->transactionCommitted)
 		throw runtime_error("Transaction not yet begun.");
 
-	this->connection.newQuery("COMMIT TRANSACTION;").execute();
+	this->conn.new_query("COMMIT TRANSACTION;").execute();
 	this->transactionCommitted = true;
 }
 
@@ -41,16 +37,16 @@ void IDBContext::rollbackTransaction() {
 	if (this->transactionCommitted)
 		throw runtime_error("Transaction not yet begun.");
 
-	this->connection.newQuery("ROLLBACK TRANSACTION;").execute();
+	this->conn.new_query("ROLLBACK TRANSACTION;").execute();
 	this->transactionCommitted = true;
 }
 
 ObjectId IDBContext::getNewId() {
 	if (this->nextId >= this->endOfIssuedIdBlock) {
-		auto query = this->connection.newQuery("UPDATE Config SET FieldNumber = FieldNumber + 5000 WHERE FieldName = 'NextId' RETURNING FieldNumber;");
+		auto query = this->conn.new_query("UPDATE Config SET FieldNumber = FieldNumber + 5000 WHERE FieldName = 'NextId' RETURNING FieldNumber;");
 		query.execute();
-		query.advanceToNextRow();
-		this->endOfIssuedIdBlock = query.getUInt64();
+		query.advance_row();
+		this->endOfIssuedIdBlock = query.get_uint64();
 		this->nextId = this->endOfIssuedIdBlock - 5000;
 	}
 

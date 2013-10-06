@@ -1,8 +1,8 @@
 #pragma once
 
-#include <Utilities/SQLDatabase.h>
-
 #include "Common.h"
+
+#include <Utilities/SQL/PostgreSQL.h>
 
 namespace GameServer {
 	class IDBContext {
@@ -16,8 +16,8 @@ namespace GameServer {
 		IDBContext& operator=(IDBContext&& other) = delete;
 
 		public:
-			exported IDBContext(const Utilities::SQLDatabase::Connection::Parameters& connectionParameters);
-			exported virtual ~IDBContext();
+			exported IDBContext(const util::sql::connection::parameters& connectionParameters);
+			exported virtual ~IDBContext() = default;
 
 			exported void beginTransaction();
 			exported void rollbackTransaction();
@@ -25,6 +25,6 @@ namespace GameServer {
 			exported bool wasTransactionCommitted() const;
 			exported ObjectId getNewId();
 			
-			Utilities::SQLDatabase::Connection connection;
+			util::sql::postgres::connection conn;
 	};
 }

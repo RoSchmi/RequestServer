@@ -1,13 +1,12 @@
 #include "BrokerNode.h"
 
 #include <Utilities/Common.h>
-#include <Utilities/TCPServer.h>
 
 #include "Common.h"
 
 using namespace std;
-using namespace Utilities;
-using namespace Utilities::Net;
+using namespace util;
+using namespace util::net;
 using namespace GameServer;
 
 BrokerNode::BrokerNode(libconfig::Setting& settings) : IProcessorNode(nullptr, nullptr, settings, 0) {
@@ -18,12 +17,12 @@ BrokerNode::~BrokerNode() {
 
 }
 
-void BrokerNode::onDisconnect(TCPConnection& client) {
+void BrokerNode::onDisconnect(tcp_connection& client) {
 	this->authenticatedClients.erase(reinterpret_cast<ObjectId>(client.state));
 }
 
-RequestServer::RequestResult BrokerNode::onRequest(TCPConnection& client, word workerNumber, uint8 requestCategory, uint8 requestMethod, DataStream& parameters, DataStream& response) {
-	parameters.seek(parameters.getLength() - sizeof(ObjectId));
+request_server::request_result BrokerNode::onRequest(tcp_connection& client, word workerNumber, uint8 requestCategory, uint8 requestMethod, data_stream& parameters, data_stream& response) {
+	parameters.seek(parameters.size() - sizeof(ObjectId));
 	ObjectId clientAreaId = parameters.read<ObjectId>();
 
 	if (requestCategory == 0x00 && requestMethod == 0x00) {
@@ -34,5 +33,5 @@ RequestServer::RequestResult BrokerNode::onRequest(TCPConnection& client, word w
 		this->sendMessage(clientAreaId, std::move(parameters));
 	}
 
-	return RequestServer::RequestResult::NO_RESPONSE;
+	return request_server::request_result::NO_RESPONSE;
 }
