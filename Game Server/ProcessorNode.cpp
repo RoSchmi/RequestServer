@@ -98,14 +98,14 @@ request_server::request_result processor_node::on_request(tcp_connection& client
 	}
 
 	if (this->ctx_creator) {
-		context->begin_transaction();
+		context->conn->begin_transaction();
 		resultCode = handler->process();
-		if (!context->committed()) {
+		if (!context->conn->committed()) {
 			try {
-				context->commit_transaction();
+				context->conn->commit_transaction();
 			}
 			catch (const sql::db_exception&) {
-				context->rollback_transaction();
+				context->conn->rollback_transaction();
 				return request_server::request_result::RETRY_LATER;
 			}
 		}

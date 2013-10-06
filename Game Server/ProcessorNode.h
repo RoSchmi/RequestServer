@@ -14,12 +14,13 @@
 #include <Utilities/Net/TCPConnection.h>
 
 #include "Common.h"
+#include "DBContext.h"
 
 namespace game_server {
 	class processor_node {
 		public:
-			typedef std::shared_ptr<base_handler>(*handler_creator)(word worker_num, uint8 category, uint8 method, obj_id& userId, std::shared_ptr<util::sql::connection>& db, uint16& error_code , void* state);
-			typedef std::shared_ptr<util::sql::connection>(*context_creator)(word worker_num, util::sql::connection::parameters& parameters, void* state);
+			typedef std::shared_ptr<base_handler>(*handler_creator)(word worker_num, uint8 category, uint8 method, obj_id& userId, std::shared_ptr<db_context>& db, uint16& error_code, void* state);
+			typedef std::shared_ptr<db_context>(*context_creator)(word worker_num, util::sql::connection::parameters& parameters, void* state);
 
 			exported processor_node(handler_creator hndlr_creator, context_creator ctx_creator, libconfig::Setting& settings, obj_id area_id, void* state = nullptr);
 			exported virtual ~processor_node() = default;
@@ -44,8 +45,8 @@ namespace game_server {
 			void* state;
 			handler_creator hndlr_creator;
 			context_creator ctx_creator;
-			std::shared_ptr<util::sql::connection> empty_db;
-			std::vector<std::shared_ptr<util::sql::connection>> dbs;
+			std::shared_ptr<db_context> empty_db;
+			std::vector<std::shared_ptr<db_context>> dbs;
 
 			virtual void on_connect(util::net::tcp_connection& client);
 			virtual void on_disconnect(util::net::tcp_connection& client);
