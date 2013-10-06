@@ -1,24 +1,16 @@
-#include "Objects.h"
+#include "objects.h"
 
-using namespace GameServer::Objects;
+using namespace game_server::objects;
 
-IObject::IObject(uint8 objectType) {
-	this->objectType = objectType;
-	this->ownerId = 0;
+data_object::data_object(uint8 obj_type) {
+	this->obj_type = obj_type;
+	this->owner = 0;
 }
 
-IObject::~IObject() {
-
-}
-
-IMapObject::IMapObject(uint8 objectType) : IObject(objectType) {
+map_object::map_object(uint8 obj_type) : data_object(obj_type) {
 	this->width = 1;
 	this->height = 1;
-	this->planetId = 0;
+	this->planet_id = 0;
 	this->x = 0;
 	this->y = 0;
-}
-
-IMapObject::~IMapObject() {
-	
 }

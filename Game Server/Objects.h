@@ -6,21 +6,21 @@
 
 #include "Common.h"
 
-namespace GameServer {
-	namespace Objects {
-		struct IObject : public util::sql::db_object<uint64>  {
-			exported IObject(uint8 objectType);
-			exported virtual ~IObject();
+namespace game_server {
+	namespace objects {
+		struct data_object : public util::sql::db_object<uint64>  {
+			exported data_object(uint8 obj_type);
+			exported virtual ~data_object() = 0;
 
-			OwnerId ownerId;
-			uint8 objectType;
+			owner_id owner;
+			uint8 obj_type;
 		};
 
-		struct IMapObject : public IObject {
-			exported IMapObject(uint8 objectType);
-			exported virtual ~IMapObject();
+		struct map_object : public data_object {
+			exported map_object(uint8 obj_type);
+			exported virtual ~map_object() = 0;
 			
-			ObjectId planetId;
+			obj_id planet_id;
 			coord x;
 			coord y;
 

@@ -11,19 +11,19 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="BrokerNode.cpp" />
-    <ClCompile Include="IDBContext.cpp" />
+    <ClCompile Include="DBContext.cpp" />
     <ClCompile Include="Objects.cpp" />
-    <ClCompile Include="ICacheProvider.cpp" />
-    <ClCompile Include="IProcessorNode.cpp" />
+    <ClCompile Include="CacheProvider.cpp" />
+    <ClCompile Include="ProcessorNode.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BrokerNode.h" />
     <ClInclude Include="Common.h" />
-    <ClInclude Include="IProcessorNode.h" />
+    <ClInclude Include="ProcessorNode.h" />
     <ClInclude Include="Objects.h" />
     <ClInclude Include="Collections.h" />
-    <ClInclude Include="ICacheProvider.h" />
-    <ClInclude Include="IDBContext.h" />
+    <ClInclude Include="CacheProvider.h" />
+    <ClInclude Include="DBContext.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="CMakeLists.txt" />
