@@ -8,32 +8,28 @@ using namespace util::net;
 using namespace game_server;
 
 processor_node::processor_node(handler_creator hndlr_creator, context_creator ctx_creator, libconfig::Setting& settings, obj_id area_id, void* state) {
-	this->workers = settings["workerThreads"];
+	this->workers = settings["workers"];
 	this->hndlr_creator = hndlr_creator;
 	this->ctx_creator = ctx_creator;
 	this->area_id = area_id;
 	this->state = state;
 
-	auto& dbSettings = settings["Database"];
+	auto& dbSettings = settings["db"];
 	this->db_parameters = { dbSettings["host"].c_str(), dbSettings["port"].c_str(), dbSettings["dbname"].c_str(), dbSettings["role"].c_str(), dbSettings["password"].c_str() };
 
 	if (this->ctx_creator)
 		for (word i = 0; i < this->workers; i++)
 			this->dbs[i] = this->ctx_creator(i, this->db_parameters, this->state);
 
-		this->server = request_server(vector<string> { settings["tcpServerPort"].c_str(), settings["webSocketServerPort"].c_str() }, vector<bool> { false, true }, this->workers, result_codes::RETRY_LATER, processor_node::on_request_d, processor_node::on_connect_d, processor_node::on_disconnect_d, this);
+	this->server = request_server(vector<string> { settings["tcp_port"].c_str(), settings["ws_port"].c_str() }, vector<bool> { false, true }, this->workers, result_codes::RETRY_LATER, processor_node::on_request_d, processor_node::on_connect_d, processor_node::on_disconnect_d, this);
 
 	if (this->area_id != 0) {
-		tcp_connection broker(settings["brokerAddress"].c_str(), settings["brokerPort"].c_str(), this);
+		tcp_connection broker(settings["broker_address"].c_str(), settings["broker_port"].c_str(), this);
 		broker.state = reinterpret_cast<void*>(this->area_id);
 		this->broker = &this->server.adopt(move(broker));
 		this->authenticated_clients[this->area_id].push_back(this->broker);
 		this->send_to_broker(this->area_id, this->create_message(0x00, 0x00));
 	}
-}
-
-processor_node::~processor_node() {
-
 }
 
 void processor_node::send(obj_id receipient_id, data_stream&& notification) {
@@ -104,12 +100,14 @@ request_server::request_result processor_node::on_request(tcp_connection& client
 	if (this->ctx_creator) {
 		context->begin_transaction();
 		resultCode = handler->process();
-		try {
-			context->commit_transaction();
-		}
-		catch (const sql::db_exception&) {
-			context->rollback_transaction();
-			return request_server::request_result::RETRY_LATER;
+		if (!context->committed()) {
+			try {
+				context->commit_transaction();
+			}
+			catch (const sql::db_exception&) {
+				context->rollback_transaction();
+				return request_server::request_result::RETRY_LATER;
+			}
 		}
 	}
 	else {

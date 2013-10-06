@@ -12,6 +12,7 @@ namespace game_server {
 
 	class base_handler {
 		public:
+			exported virtual ~base_handler() = 0;
 			exported virtual result_code process() = 0;
 			exported virtual void deserialize(util::data_stream& parameters) = 0;
 			exported virtual void serialize(util::data_stream& response) = 0;

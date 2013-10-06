@@ -13,21 +13,25 @@
 #include <Utilities/Net/RequestServer.h>
 #include <Utilities/Net/TCPConnection.h>
 
-#include "DBContext.h"
 #include "Common.h"
 
 namespace game_server {
 	class processor_node {
 		public:
-			typedef std::shared_ptr<base_handler>(*handler_creator)(word worker_num, uint8 category, uint8 method, obj_id& userId, std::shared_ptr<db_context>& db, uint16& error_code , void* state);
-			typedef std::shared_ptr<db_context>(*context_creator)(word worker_num, util::sql::connection::parameters& parameters, void* state);
+			typedef std::shared_ptr<base_handler>(*handler_creator)(word worker_num, uint8 category, uint8 method, obj_id& userId, std::shared_ptr<util::sql::connection>& db, uint16& error_code , void* state);
+			typedef std::shared_ptr<util::sql::connection>(*context_creator)(word worker_num, util::sql::connection::parameters& parameters, void* state);
 
 			exported processor_node(handler_creator hndlr_creator, context_creator ctx_creator, libconfig::Setting& settings, obj_id area_id, void* state = nullptr);
-			exported virtual ~processor_node();
+			exported virtual ~processor_node() = default;
 
 			exported void send(obj_id receipient_id, util::data_stream&& notification);
 			exported void send_to_broker(obj_id target_id, util::data_stream&& message);
 			exported util::data_stream create_message(uint8 category, uint8 type);
+
+			processor_node(const processor_node& other) = delete;
+			processor_node(processor_node&& other) = delete;
+			processor_node& operator=(processor_node&& other) = delete;
+			processor_node& operator=(const processor_node& other) = delete;
 
 		protected:
 			util::sql::connection::parameters db_parameters;
@@ -40,8 +44,8 @@ namespace game_server {
 			void* state;
 			handler_creator hndlr_creator;
 			context_creator ctx_creator;
-			std::shared_ptr<db_context> empty_db;
-			std::vector<std::shared_ptr<db_context>> dbs;
+			std::shared_ptr<util::sql::connection> empty_db;
+			std::vector<std::shared_ptr<util::sql::connection>> dbs;
 
 			virtual void on_connect(util::net::tcp_connection& client);
 			virtual void on_disconnect(util::net::tcp_connection& client);
