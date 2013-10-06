@@ -1,8 +1,8 @@
 #pragma once
 
-#include "Common.h"
-
 #include <Utilities/SQL/PostgreSQL.h>
+
+#include "Common.h"
 
 namespace game_server {
 	class db_context {

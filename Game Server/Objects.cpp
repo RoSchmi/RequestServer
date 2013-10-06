@@ -1,5 +1,6 @@
-#include "objects.h"
+#include "Objects.h"
 
+using namespace game_server;
 using namespace game_server::objects;
 
 data_object::data_object(uint8 obj_type) {
