@@ -9,7 +9,7 @@ using namespace util;
 using namespace util::net;
 using namespace game_server;
 
-broker_node::broker_node(libconfig::Setting& settings) : processor_node(nullptr, nullptr, settings, 0) {
+broker_node::broker_node(libconfig::Setting& settings) : processor_node(settings) {
 
 }
 
@@ -23,11 +23,12 @@ request_server::request_result broker_node::on_request(tcp_connection& client, w
 
 	if (category == 0x00 && method == 0x00) {
 		client.state = reinterpret_cast<void*>(client_area_id);
-		this->authenticated_clients[client_area_id].push_back(&client);
+		this->authenticated_clients[client_area_id].push_back(client);
 	}
 	else {
+		parameters.shrink_written(parameters.size() - sizeof(obj_id));
 		this->send(client_area_id, move(parameters));
 	}
 
-	return request_server::request_result::NO_RESPONSE;
+	return request_server::request_result::no_response;
 }

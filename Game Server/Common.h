@@ -10,28 +10,21 @@ namespace game_server {
 	typedef float64 coord;
 	typedef uint32 size;
 
-	class base_handler {
-		public:
-			exported virtual ~base_handler() = 0;
-			exported virtual result_code process() = 0;
-			exported virtual void deserialize(util::data_stream& parameters) = 0;
-			exported virtual void serialize(util::data_stream& response) = 0;
-	};
-
 	class result_codes {
 		public:
-			static const result_code SUCCESS = 0;
-			static const result_code SERVER_ERROR = 1;
-			static const result_code RETRY_LATER = 2;
-			static const result_code INVALID_REQUEST_TYPE = 3;
-			static const result_code INVALID_PARAMETERS = 4;
-			static const result_code INVALID_SERVER = 5;
-			static const result_code STRING_IS_NOT_UTF8 = 6;
-			static const result_code STRING_TOO_LONG = 7;
-			static const result_code OUT_OF_BOUNDS = 8;
-			static const result_code NOT_IN_LOS = 9;
-			static const result_code LOCATION_OCCUPIED = 10;
-			static const result_code INVALID_LOCATION = 11;
-			static const result_code NO_RESPONSE = 12;
+			static const result_code success = 0;
+			static const result_code server_error = 1;
+			static const result_code retry_later = 2;
+			static const result_code invalid_request_type = 3;
+			static const result_code invalid_parameters = 4;
+			static const result_code invalid_server = 5;
+			static const result_code string_isnt_utf8 = 6;
+			static const result_code string_too_long = 7;
+			static const result_code out_of_bounds = 8;
+			static const result_code not_in_los = 9;
+			static const result_code location_occupied = 10;
+			static const result_code invalid_location = 11;
+			static const result_code no_response = 12;
+			static const result_code not_authenticated = 13;
 	};
 }
