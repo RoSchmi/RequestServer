@@ -20,7 +20,6 @@
     <ClInclude Include="Common.h" />
     <ClInclude Include="ProcessorNode.h" />
     <ClInclude Include="Objects.h" />
-    <ClInclude Include="DBTable.h" />
     <ClInclude Include="CacheProvider.h" />
   </ItemGroup>
   <ItemGroup>

@@ -111,13 +111,18 @@ namespace game_server {
 					return util::net::request_server::request_result::success;
 				}
 
-				context.begin_transaction();
-				result = handler.process(authenticated_id, context);
+				context.begin_transaction(util::sql::connection::isolation_level::repeatable_read);
+				try {
+					result = handler.process(authenticated_id, context);
+				}
+				catch (const util::sql::synchronization_exception&) {
+					return util::net::request_server::request_result::retry_later;
+				}
 				if (!context.committed()) {
 					try {
 						context.commit_transaction();
 					}
-					catch (const util::sql::db_exception&) {
+					catch (const util::sql::synchronization_exception&) {
 						context.rollback_transaction();
 						return util::net::request_server::request_result::retry_later;
 					}

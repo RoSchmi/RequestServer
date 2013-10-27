@@ -13,6 +13,8 @@ data_object::~data_object() {
 }
 
 map_object::map_object(uint8 obj_type) : data_object(obj_type) {
+	this->last_updated = date_time::clock::now();
+
 	this->width = 1;
 	this->height = 1;
 	this->planet_id = 0;

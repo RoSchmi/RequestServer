@@ -1,7 +1,5 @@
 #pragma once
 
-#include <string>
-
 #include <Utilities/SQL/Database.h>
 
 #include "Common.h"
@@ -19,11 +17,13 @@ namespace game_server {
 		struct map_object : public data_object {
 			exported map_object(uint8 obj_type);
 			exported virtual ~map_object() = 0;
-			
+			exported virtual map_object* clone() = 0;
+
+			date_time last_updated;
+
 			obj_id planet_id;
 			coord x;
 			coord y;
-
 			size width;
 			size height;
 		};

@@ -7,7 +7,7 @@ namespace game_server {
 	typedef uint16 result_code;
 	typedef uint64 owner_id;
 	typedef uint64 obj_id;
-	typedef float64 coord;
+	typedef uint64 coord;
 	typedef uint32 size;
 
 	class result_codes {
