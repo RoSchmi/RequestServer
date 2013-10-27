@@ -10,7 +10,7 @@ using namespace util::sql;
 using namespace game_server;
 using namespace game_server::objects;
 
-cache_provider::cache_provider(coord start_x, coord start_y, size width, size height, size los_radius, bool allow_split_reads, bool allow_split_updates) {
+cache_provider::cache_provider(coord start_x, coord start_y, size width, size height, size los_radius) {
 	this->start_x = start_x;
 	this->start_y = start_y;
 	this->end_x = start_x + width;
@@ -18,8 +18,6 @@ cache_provider::cache_provider(coord start_x, coord start_y, size width, size he
 	this->width = width;
 	this->height = height;
 	this->los_radius = los_radius;
-	this->allow_split_reads = allow_split_reads;
-	this->allow_split_updates = allow_split_updates;
 }
 
 cache_provider::~cache_provider() {
@@ -35,15 +33,6 @@ void cache_provider::begin_update() {
 void cache_provider::end_update() {
 	this->updater = thread::id();
 	this->mtx.unlock();
-}
-
-void cache_provider::reset_read_start() {
-	this->read_starts.erase(this_thread::get_id());
-}
-
-void cache_provider::check_last_updated(map_object* object) {
-	if (!this->allow_split_reads && object->last_updated > this->read_starts[this_thread::get_id()])
-		throw synchronization_exception();
 }
 
 void cache_provider::remove(map_object& object) {

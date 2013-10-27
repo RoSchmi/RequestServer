@@ -24,10 +24,7 @@ namespace game_server {
 		size height;
 		size los_radius;
 
-		bool allow_split_reads;
-		bool allow_split_updates;
 		std::thread::id updater;
-		std::unordered_map<std::thread::id, date_time> read_starts;
 
 		std::mutex mtx;
 		std::unordered_map<owner_id, std::vector<objects::map_object*>> owner_idx;
@@ -35,7 +32,6 @@ namespace game_server {
 		std::unordered_map<coord, std::unordered_map<coord, objects::map_object*>> loc_idx;
 
 		objects::map_object*& get_loc(coord x, coord y);
-		void check_last_updated(objects::map_object* obj);
 		
 		public: 
 			cache_provider(const cache_provider& other) = delete;
@@ -43,10 +39,9 @@ namespace game_server {
 			cache_provider& operator=(cache_provider&& other) = delete;
 			cache_provider& operator=(const cache_provider& other) = delete;
 		
-			exported cache_provider(coord start_x, coord start_y, size width, size height, size los_radius, bool allow_split_reads = false, bool allow_split_updates = false);
+			exported cache_provider(coord start_x, coord start_y, size width, size height, size los_radius);
 			exported virtual ~cache_provider();
 
-			exported void reset_read_start();
 			exported void begin_update();
 			exported void end_update();
 			exported void add(objects::map_object& object);
@@ -95,7 +90,7 @@ namespace game_server {
 			}
 
 			template<typename T> exported void update(T& object) {
-				if (!this->allow_split_updates && this->updater != std::this_thread::get_id())
+				if (this->updater != std::this_thread::get_id())
 					throw util::sql::synchronization_exception();
 
 				objects::map_object* orig = this->id_idx[object.id];
