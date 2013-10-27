@@ -71,6 +71,8 @@ namespace game_server {
 	template<typename T> class processor_node_db : public processor_node {
 		public:
 			class base_handler : public processor_node::base_handler {
+				virtual result_code process(obj_id& user_id) override { return result_codes::success; };
+
 				public:
 					exported virtual ~base_handler() = default;
 					exported virtual result_code process(obj_id& user_id, T& db) = 0;
