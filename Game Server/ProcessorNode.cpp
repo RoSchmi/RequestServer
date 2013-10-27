@@ -21,6 +21,10 @@ processor_node::processor_node(libconfig::Setting& settings, obj_id area_id) {
 	}
 }
 
+processor_node::~processor_node() {
+
+}
+
 void processor_node::start() {
 	this->server.start();
 }
@@ -73,13 +77,6 @@ data_stream processor_node::create_message(uint8 category, uint8 type) {
 	return notification;
 }
 
-void processor_node::register_handler(std::unique_ptr<base_handler> handler, uint8 category, uint8 method, bool authenticated) {
-	if (authenticated)
-		this->authenticated_handlers.emplace((category << 8) | method, std::move(handler));
-	else
-		this->unauthenticated_handlers.emplace((category << 8) | method, std::move(handler));
-}
-
 void processor_node::on_connect(tcp_connection& client) {
 
 }
@@ -99,10 +96,10 @@ request_server::request_result processor_node::on_request(tcp_connection& client
 		return request_server::request_result::success;
 	}
 
-	auto& handler = authenticated_id != 0 ? this->authenticated_handlers[type] : this->unauthenticated_handlers[type];
+	auto& handler = *reinterpret_cast<base_handler*>(authenticated_id != 0 ? this->authenticated_handlers[type][worker_num].get() : this->unauthenticated_handlers[type][worker_num].get());
 
 	try {
-		handler->deserialize(parameters);
+		handler.deserialize(parameters);
 	}
 	catch (data_stream::read_past_end_exception&) {
 		response.write(result_codes::invalid_parameters);
@@ -110,7 +107,7 @@ request_server::request_result processor_node::on_request(tcp_connection& client
 	}
 
 	try {
-		result = handler->process(authenticated_id);
+		result = handler.process(authenticated_id);
 	}
 	catch (sql::synchronization_exception&) {
 		return request_server::request_result::retry_later;
@@ -119,7 +116,7 @@ request_server::request_result processor_node::on_request(tcp_connection& client
 	response.write(result);
 
 	if (result == result_codes::success)
-		handler->serialize(response);
+		handler.serialize(response);
 	else if (result == result_codes::no_response)
 		return request_server::request_result::no_response;
 

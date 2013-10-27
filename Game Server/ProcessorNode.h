@@ -2,11 +2,12 @@
 
 #include <string>
 #include <mutex>
-#include <map>
+#include <unordered_map>
 #include <memory>
 #include <vector>
 #include <functional>
 #include <algorithm>
+#include <type_traits>
 
 #include <libconfig.h++>
 
@@ -23,8 +24,8 @@ namespace game_server {
 		public:
 			class base_handler {
 				public:
-					exported virtual ~base_handler() = 0;
-					exported virtual result_code process(obj_id& user_id);
+					exported virtual ~base_handler() = default;
+					exported virtual result_code process(obj_id& user_id) = 0;
 					exported virtual void deserialize(util::data_stream& parameters) = 0;
 					exported virtual void serialize(util::data_stream& response) = 0;
 			};
@@ -35,11 +36,11 @@ namespace game_server {
 			processor_node& operator=(const processor_node& other) = delete;
 
 		protected:
-			std::map<uint16, std::unique_ptr<base_handler>> authenticated_handlers;
-			std::map<uint16, std::unique_ptr<base_handler>> unauthenticated_handlers;
+			std::unordered_map<uint16, std::vector<std::unique_ptr<base_handler>>> authenticated_handlers;
+			std::unordered_map<uint16, std::vector<std::unique_ptr<base_handler>>> unauthenticated_handlers;
 			util::net::request_server server;
 			util::optional<util::net::tcp_connection&> broker;
-			std::map<obj_id, std::vector<std::reference_wrapper<util::net::tcp_connection>>> authenticated_clients;
+			std::unordered_map<obj_id, std::vector < std::reference_wrapper<util::net::tcp_connection>>> authenticated_clients;
 			std::mutex clients_lock;
 			obj_id area_id;
 			word workers;
@@ -49,27 +50,33 @@ namespace game_server {
 
 		public:
 			exported processor_node(libconfig::Setting& settings, obj_id area_id = 0);
-			exported virtual ~processor_node() = default;
+			exported virtual ~processor_node();
 
 			exported void start();
 			exported void send(obj_id receipient_id, util::data_stream notification);
 			exported void send_to_broker(obj_id target_id, util::data_stream message);
 			exported util::data_stream create_message(uint8 category, uint8 type);
-			exported void register_handler(std::unique_ptr<base_handler> handler, uint8 category, uint8 method, bool authenticated = true);
 			exported virtual void on_connect(util::net::tcp_connection& client);
 			exported virtual void on_disconnect(util::net::tcp_connection& client);
 			exported virtual util::net::request_server::request_result on_request(util::net::tcp_connection& client, word worker_num, uint8 category, uint8 method, util::data_stream& parameters, util::data_stream& response);
+
+			template<typename T> exported void register_handler(uint8 category, uint8 method, bool authenticated) {
+				static_assert(std::is_base_of<base_handler, T>::value, "typename T must derive from base_handler.");
+
+				for (word i = 0; i < this->workers; i++)
+					(authenticated ? this->authenticated_handlers : this->unauthenticated_handlers)[(category << 8) | method].emplace_back(new T());
+			}
 	};
 
 	template<typename T> class processor_node_db : public processor_node {
 		public:
 			class base_handler : public processor_node::base_handler {
 				public:
-					exported virtual ~base_handler() = 0;
-					exported virtual result_code process(obj_id& user_id, T& db);
+					exported virtual ~base_handler() = default;
+					exported virtual result_code process(obj_id& user_id, T& db) = 0;
 			};
 
-			typedef std::function<T(word, util::sql::connection::parameters&)> context_creator;
+			typedef std::function<std::unique_ptr<T>(word, util::sql::connection::parameters&)> context_creator;
 
 			processor_node_db(const processor_node_db& other) = delete;
 			processor_node_db(processor_node_db&& other) = delete;
@@ -77,7 +84,7 @@ namespace game_server {
 			processor_node_db& operator=(const processor_node_db& other) = delete;
 
 		protected:
-			std::vector<T> dbs;
+			std::vector<std::unique_ptr<T>> dbs;
 
 		public:
 			exported processor_node_db(libconfig::Setting& settings, context_creator ctx_creator, obj_id area_id = 0) : processor_node(settings, area_id) {
@@ -87,21 +94,23 @@ namespace game_server {
 					this->dbs.emplace_back(std::move(ctx_creator(i, paras)));
 			}
 
-			exported virtual ~processor_node_db() = default;
+			exported virtual ~processor_node_db() {
+			
+			}
 
 			exported virtual util::net::request_server::request_result on_request(util::net::tcp_connection& client, word worker_num, uint8 category, uint8 method, util::data_stream& parameters, util::data_stream& response) override {
 				result_code result = result_codes::success;
 				obj_id authenticated_id = reinterpret_cast<obj_id>(client.state);
 				obj_id start_id = authenticated_id;
 				uint16 type = (category << 8) | method;
-				T& context = this->dbs[worker_num];
+				T& context = *this->dbs[worker_num].get();
 
 				if ((authenticated_id != 0 && this->authenticated_handlers.count(type) == 0) || (authenticated_id == 0 && this->unauthenticated_handlers.count(type) == 0)) {
 					response.write(result_codes::invalid_request_type);
 					return util::net::request_server::request_result::success;
 				}
 
-				auto& handler = *reinterpret_cast<base_handler*>(authenticated_id != 0 ? this->authenticated_handlers[type].get() : this->unauthenticated_handlers[type].get());
+				auto& handler = *reinterpret_cast<base_handler*>(authenticated_id != 0 ? this->authenticated_handlers[type][worker_num].get() : this->unauthenticated_handlers[type][worker_num].get());
 
 				try {
 					handler.deserialize(parameters);
