@@ -3,18 +3,15 @@
 using namespace game_server;
 using namespace game_server::objects;
 
-data_object::data_object(uint8 obj_type) {
-	this->obj_type = obj_type;
-	this->owner = 0;
+cached_object::cached_object() {
+	this->last_updated_by_cache = date_time::clock::now();
 }
 
-data_object::~data_object() {
+cached_object::~cached_object() {
 
 }
 
-map_object::map_object(uint8 obj_type) : data_object(obj_type) {
-	this->last_updated = date_time::clock::now();
-
+map_object::map_object(uint8 obj_type) : object(obj_type) {
 	this->width = 1;
 	this->height = 1;
 	this->planet_id = 0;
