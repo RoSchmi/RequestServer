@@ -25,22 +25,30 @@ cache_provider::~cache_provider() {
 		delete i.second;
 }
 
-void cache_provider::begin_update() {
+void cache_provider::lock() {
 	this->mtx.lock();
-	this->updater = this_thread::get_id();
+	this->lock_holder = this_thread::get_id();
 }
 
-void cache_provider::end_update() {
-	this->updater = thread::id();
+void cache_provider::unlock() {
+	this->lock_holder = thread::id();
 	this->mtx.unlock();
 }
 
+void cache_provider::begin_update(coord x, coord y, size width, size height) {
+	this->lock();
+}
+
+void cache_provider::end_update() {
+	this->unlock();
+}
+
 void cache_provider::remove(map_object& object) {
-	unique_lock<mutex> lck(this->mtx);
+	unique_lock<recursive_mutex> lck(this->mtx);
 
 	auto ptr = this->id_idx[object.id];
 
-	if (ptr->last_updated != object.last_updated)
+	if (ptr->last_updated_by_cache != object.last_updated_by_cache)
 		throw synchronization_exception();
 
 	auto& owner = this->owner_idx[object.owner];
@@ -58,11 +66,11 @@ void cache_provider::remove(map_object& object) {
 }
 
 void cache_provider::add(map_object& object) {
-	unique_lock<mutex> lck(this->mtx);
+	unique_lock<recursive_mutex> lck(this->mtx);
 
 	for (coord x = object.x; x < object.x + object.width; x++)
 		for (coord y = object.y; y < object.y + object.height; y++)
-			if (this->get_loc(x, y))
+			if (this->get_loc(x, y) != nullptr)
 				throw synchronization_exception();
 
 	auto new_obj = object.clone();
@@ -86,7 +94,7 @@ void cache_provider::clamp(coord& start_x, coord& start_y, coord& end_x, coord& 
 }
 
 unique_ptr<map_object> cache_provider::get_by_id(obj_id search_id) {
-	unique_lock<mutex> lck(this->mtx);
+	unique_lock<recursive_mutex> lck(this->mtx);
 
 	if (this->id_idx.count(search_id) == 0)
 		return nullptr;
@@ -95,7 +103,7 @@ unique_ptr<map_object> cache_provider::get_by_id(obj_id search_id) {
 }
 
 unique_ptr<map_object> cache_provider::get_at_location(coord x, coord y) {
-	unique_lock<mutex> lck(this->mtx);
+	unique_lock<recursive_mutex> lck(this->mtx);
 
 	auto obj = this->get_loc(x, y);
 	if (obj)
@@ -111,7 +119,7 @@ vector<unique_ptr<objects::map_object>> cache_provider::get_in_area(coord x, coo
 	
 	this->clamp(x, y, end_x, end_y);
 				
-	unique_lock<mutex> lck(this->mtx);
+	unique_lock<recursive_mutex> lck(this->mtx);
 	for (; x < end_x; x++) {
 		for (y = end_y - height; y < end_y; y++) {
 			map_object* current = this->get_loc(x, y);
@@ -126,7 +134,7 @@ vector<unique_ptr<objects::map_object>> cache_provider::get_in_area(coord x, coo
 vector<unique_ptr<map_object>> cache_provider::get_by_owner(owner_id owner) {
 	vector<unique_ptr<map_object>> result;
 
-	unique_lock<mutex> lck(this->mtx);
+	unique_lock<recursive_mutex> lck(this->mtx);
 	if (this->owner_idx.count(owner) != 0)
 		for (auto i : this->owner_idx[owner])
 			result.emplace_back(i->clone());
@@ -137,7 +145,7 @@ vector<unique_ptr<map_object>> cache_provider::get_by_owner(owner_id owner) {
 vector<unique_ptr<map_object>> cache_provider::get_in_owner_los(owner_id owner) {
 	vector<unique_ptr<map_object>> result;
 
-	unique_lock<mutex> lck(this->mtx);
+	unique_lock<recursive_mutex> lck(this->mtx);
 	if (this->owner_idx.count(owner) == 0)
 		return result;
 
@@ -183,7 +191,7 @@ vector<obj_id> cache_provider::get_users_with_los_at(coord x, coord y) {
 
 	this->clamp(start_x, start_y, end_x, end_y);
 
-	unique_lock<mutex> lck(this->mtx);
+	unique_lock<recursive_mutex> lck(this->mtx);
 	for (coord this_x = start_x; this_x < end_x; this_x++) {
 		for (coord this_y = start_y; this_y < end_y; this_y++) {
 			map_object* current = this->get_loc(this_x, this_y);
@@ -201,7 +209,7 @@ bool cache_provider::is_area_empty(coord x, coord y, size width, size height) {
 
 	this->clamp(x, y, end_x, end_y);
 
-	unique_lock<mutex> lck(this->mtx);
+	unique_lock<recursive_mutex> lck(this->mtx);
 	for (; x < end_x; x++)
 		for (y = end_y - height; y < end_y; y++)
 			if (this->get_loc(x, y))
@@ -218,7 +226,7 @@ bool cache_provider::is_location_in_los(coord x, coord y, owner_id owner) {
 
 	this->clamp(start_x, start_y, end_x, end_y);
 
-	unique_lock<mutex> lck(this->mtx);
+	unique_lock<recursive_mutex> lck(this->mtx);
 	for (x = start_x; x < end_x; x++) {
 		for (y = start_y; y < end_y; y++) {
 			map_object* current = this->get_loc(x, y);
@@ -236,6 +244,6 @@ bool cache_provider::is_location_in_bounds(coord x, coord y, size width, size he
 }
 
 bool cache_provider::is_user_present(obj_id user_id) {
-	unique_lock<mutex> lck(this->mtx);
+	unique_lock<recursive_mutex> lck(this->mtx);
 	return this->owner_idx.count(user_id) != 0;
 }

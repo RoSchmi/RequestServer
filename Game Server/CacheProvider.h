@@ -24,9 +24,9 @@ namespace game_server {
 		size height;
 		size los_radius;
 
-		std::thread::id updater;
-
-		std::mutex mtx;
+		std::thread::id lock_holder;
+		std::recursive_mutex mtx;
+		
 		std::unordered_map<owner_id, std::vector<objects::map_object*>> owner_idx;
 		std::unordered_map<obj_id, objects::map_object*> id_idx;
 		std::unordered_map<coord, std::unordered_map<coord, objects::map_object*>> loc_idx;
@@ -42,7 +42,9 @@ namespace game_server {
 			exported cache_provider(coord start_x, coord start_y, size width, size height, size los_radius);
 			exported virtual ~cache_provider();
 
-			exported void begin_update();
+			exported void lock();
+			exported void unlock();
+			exported void begin_update(coord x = 0, coord y = 0, size width = 0, size height = 0);
 			exported void end_update();
 			exported void add(objects::map_object& object);
 			exported void remove(objects::map_object& object);
@@ -63,7 +65,7 @@ namespace game_server {
 			exported bool is_user_present(obj_id user_id);
 
 			template<typename T> exported T get_by_id(obj_id search_id) {
-				std::unique_lock<std::mutex> lck(this->mtx);
+				std::unique_lock<std::recursive_mutex> lck(this->mtx);
 
 				if (this->id_idx.count(search_id) == 0)
 					return T();
@@ -90,14 +92,19 @@ namespace game_server {
 			}
 
 			template<typename T> exported void update(T& object) {
-				if (this->updater != std::this_thread::get_id())
+				if (this->lock_holder != std::this_thread::get_id())
 					throw util::sql::synchronization_exception();
 
 				objects::map_object* orig = this->id_idx[object.id];
 
-				if (orig->last_updated != object.last_updated)
+				if (orig->last_updated_by_cache != object.last_updated_by_cache)
 					throw util::sql::synchronization_exception();
 
+				for (coord x = object.x; x < object.x + object.width; x++)
+					for (coord y = object.y; y < object.y + object.height; y++)
+						if (this->get_loc(x, y) != nullptr)
+							throw util::sql::synchronization_exception();
+								
 				if (object.x != orig->x || object.y != orig->y) {
 					for (coord x = object.x; x < object.x + object.width; x++)
 						for (coord y = object.y; y < object.y + object.height; y++)
@@ -108,7 +115,7 @@ namespace game_server {
 							this->get_loc(x, y) = orig;
 				}
 
-				object.last_updated = date_time::clock::now();
+				object.last_updated_by_cache = date_time::clock::now();
 
 				memcpy(orig, &object, sizeof(T));
 			}

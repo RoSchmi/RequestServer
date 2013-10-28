@@ -19,7 +19,7 @@ namespace game_server {
 			exported virtual ~map_object() = 0;
 			exported virtual map_object* clone() = 0;
 
-			date_time last_updated;
+			date_time last_updated_by_cache;
 
 			obj_id planet_id;
 			coord x;
