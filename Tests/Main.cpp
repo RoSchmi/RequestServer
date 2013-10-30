@@ -11,14 +11,13 @@ using namespace game_server;
 using namespace util;
 using namespace std;
 
-class obj : public objects::map_object {
+class obj : public objects::map_owned_obj {
 	public:
-		obj() : objects::map_object(0) {};
-		obj* clone() override { return new obj(*this); };
+		base_obj* clone() const override { return new obj(*this); };
 };
 
 struct foo {
-	void begin_transaction() {};
+	void begin_transaction(util::sql::connection::isolation_level level) {};
 	void commit_transaction() {};
 	void rollback_transaction() {};
 	bool committed() { return true; };
@@ -31,6 +30,9 @@ int main(int argc, char **argv) {
 	cache_provider cache(0, 0, 0, 0, 0);
 	obj o;
 	unique_ptr<obj> p;
+
+	cache.add(o);
+	cache.remove(o);
 
 	cache.update(o);
 	cache.update_single(o);

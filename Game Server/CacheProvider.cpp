@@ -6,7 +6,6 @@
 
 using namespace std;
 using namespace util;
-using namespace util::sql;
 using namespace game_server;
 using namespace game_server::objects;
 
@@ -43,46 +42,45 @@ void cache_provider::end_update() {
 	this->unlock();
 }
 
-void cache_provider::remove(map_object& object) {
-	unique_lock<recursive_mutex> lck(this->mtx);
+void cache_provider::add_internal(base_obj* object) {
+	this->id_idx[object->id] = object;
+}
 
-	auto ptr = this->id_idx[object.id];
+bool cache_provider::add_internal(map_obj* object) {
+	for (coord x = object->x; x < object->x + object->width; x++)
+		for (coord y = object->y; y < object->y + object->height; y++)
+			if (this->get_loc(x, y) != nullptr)
+				return false;
 
-	if (ptr->last_updated_by_cache != object.last_updated_by_cache)
-		throw synchronization_exception();
+	for (coord x = object->x; x < object->x + object->width; x++)
+		for (coord y = object->y; y < object->y + object->height; y++)
+			this->get_loc(x, y) = object;
 
-	auto& owner = this->owner_idx[object.owner];
-	auto iter = find(owner.begin(), owner.end(), ptr);
+	return true;
+}
+
+void cache_provider::add_internal(owned_obj* object) {
+	this->owner_idx[object->owner][object->id] = object;
+}
+
+void cache_provider::remove_internal(base_obj* object) {
+	this->id_idx.erase(object->id);
+}
+
+void cache_provider::remove_internal(map_obj* object) {
+	for (coord x = object->x; x < object->x + object->width; x++)
+		for (coord y = object->y; y < object->y + object->height; y++)
+			this->get_loc(x, y) = nullptr;
+}
+
+void cache_provider::remove_internal(owned_obj* object) {
+	auto& owner = this->owner_idx[object->owner];
+	auto iter = find(owner.begin(), owner.end(), object);
 	if (iter != owner.end())
 		owner.erase(iter);
-
-	for (coord x = object.x; x < object.x + object.width; x++)
-		for (coord y = object.y; y < object.y + object.height; y++)
-			this->get_loc(x, y) = nullptr;
-
-	this->id_idx.erase(object.id);
-
-	delete ptr;
 }
 
-void cache_provider::add(map_object& object) {
-	unique_lock<recursive_mutex> lck(this->mtx);
-
-	for (coord x = object.x; x < object.x + object.width; x++)
-		for (coord y = object.y; y < object.y + object.height; y++)
-			if (this->get_loc(x, y) != nullptr)
-				throw synchronization_exception();
-
-	auto new_obj = object.clone();
-	this->id_idx[object.id] = new_obj;
-	this->owner_idx[object.owner][object.id] = new_obj;
-
-	for (coord x = object.x; x < object.x + object.width; x++)
-		for (coord y = object.y; y < object.y + object.height; y++)
-			this->get_loc(x, y) = new_obj;
-}
-
-map_object*& cache_provider::get_loc(coord x, coord y) {
+map_obj*& cache_provider::get_loc(coord x, coord y) {
 	return this->loc_idx[x][y];
 }
 
@@ -93,27 +91,27 @@ void cache_provider::clamp(coord& start_x, coord& start_y, coord& end_x, coord& 
 	if (end_y >= this->end_y) end_y = this->end_y - 1;
 }
 
-unique_ptr<map_object> cache_provider::get_by_id(obj_id search_id) {
+unique_ptr<base_obj> cache_provider::get_by_id(obj_id search_id) {
 	unique_lock<recursive_mutex> lck(this->mtx);
 
 	if (this->id_idx.count(search_id) == 0)
 		return nullptr;
 
-	return unique_ptr<map_object>(this->id_idx[search_id]->clone());
+	return unique_ptr<base_obj>(this->id_idx[search_id]->clone_as<base_obj>());
 }
 
-unique_ptr<map_object> cache_provider::get_at_location(coord x, coord y) {
+unique_ptr<map_obj> cache_provider::get_at_location(coord x, coord y) {
 	unique_lock<recursive_mutex> lck(this->mtx);
 
 	auto obj = this->get_loc(x, y);
 	if (obj)
-		return unique_ptr<map_object>(obj->clone());
+		return unique_ptr<map_obj>(obj->clone_as<map_obj>());
 	else
-		return unique_ptr<map_object>();
+		return unique_ptr<map_obj>();
 }
 
-vector<unique_ptr<objects::map_object>> cache_provider::get_in_area(coord x, coord y, size width, size height) {
-	vector<unique_ptr<objects::map_object>> result;
+vector<unique_ptr<map_obj>> cache_provider::get_in_area(coord x, coord y, size width, size height) {
+	vector<unique_ptr<map_obj>> result;
 	coord end_x = x + width;
 	coord end_y = y + height;
 	
@@ -122,37 +120,41 @@ vector<unique_ptr<objects::map_object>> cache_provider::get_in_area(coord x, coo
 	unique_lock<recursive_mutex> lck(this->mtx);
 	for (; x < end_x; x++) {
 		for (y = end_y - height; y < end_y; y++) {
-			map_object* current = this->get_loc(x, y);
+			map_obj* current = this->get_loc(x, y);
 			if (current)
-				result.emplace_back(current->clone());
+				result.emplace_back(current->clone_as<map_obj>());
 		}
 	}
 
 	return result;
 }
 
-vector<unique_ptr<map_object>> cache_provider::get_by_owner(owner_id owner) {
-	vector<unique_ptr<map_object>> result;
+vector<unique_ptr<owned_obj>> cache_provider::get_by_owner(owner_id owner) {
+	vector<unique_ptr<owned_obj>> result;
 
 	unique_lock<recursive_mutex> lck(this->mtx);
 	if (this->owner_idx.count(owner) != 0)
 		for (auto i : this->owner_idx[owner])
-			result.emplace_back(i->clone());
+			result.emplace_back(i->clone_as<owned_obj>());
 
 	return result;
 }
 
-vector<unique_ptr<map_object>> cache_provider::get_in_owner_los(owner_id owner) {
-	vector<unique_ptr<map_object>> result;
+vector<unique_ptr<map_obj>> cache_provider::get_in_owner_los(owner_id owner) {
+	vector<unique_ptr<map_obj>> result;
 
 	unique_lock<recursive_mutex> lck(this->mtx);
 	if (this->owner_idx.count(owner) == 0)
 		return result;
 
-	vector<map_object*> owner_objects = this->owner_idx[owner];
+	vector<owned_obj*> owner_objects = this->owner_idx[owner];
 	
 	coord start_x, start_y, end_x, end_y, x, y;
-	for (auto current_object : owner_objects) {
+	for (auto object : owner_objects) {
+		auto current_object = dynamic_cast<map_obj*>(object);
+		if (!current_object)
+			continue;
+
 		start_x = current_object->x - this->los_radius;
 		start_y = current_object->y - this->los_radius;
 		end_x = current_object->x + this->los_radius;
@@ -162,9 +164,9 @@ vector<unique_ptr<map_object>> cache_provider::get_in_owner_los(owner_id owner) 
 		
 		for (x = start_x; x < end_x; x++) {
 			for (y = start_y; y < end_y; y++) {
-				map_object* current_test_object = this->get_loc(x, y);
+				auto current_test_object = this->get_loc(x, y);
 				if (current_test_object)
-					result.emplace_back(current_test_object->clone());
+					result.emplace_back(current_test_object->clone_as<map_obj>());
 			}
 		}
 	}
@@ -172,8 +174,8 @@ vector<unique_ptr<map_object>> cache_provider::get_in_owner_los(owner_id owner) 
 	return result;
 }
 
-vector<unique_ptr<map_object>> cache_provider::get_in_owner_los(owner_id owner, coord x, coord y, size width, size height) {
-	vector<unique_ptr<map_object>> result;
+vector<unique_ptr<map_obj>> cache_provider::get_in_owner_los(owner_id owner, coord x, coord y, size width, size height) {
+	vector<unique_ptr<map_obj>> result;
 
 	for (auto& current_object : this->get_in_owner_los(owner))
 		if (current_object->x >= x && current_object->y >= y && current_object->x <= x + width && current_object->y <= y + height)
@@ -194,7 +196,7 @@ vector<obj_id> cache_provider::get_users_with_los_at(coord x, coord y) {
 	unique_lock<recursive_mutex> lck(this->mtx);
 	for (coord this_x = start_x; this_x < end_x; this_x++) {
 		for (coord this_y = start_y; this_y < end_y; this_y++) {
-			map_object* current = this->get_loc(this_x, this_y);
+			owned_obj* current = dynamic_cast<owned_obj*>(this->get_loc(this_x, this_y));
 			if (current)
 				result.push_back(current->owner);
 		}
@@ -229,7 +231,7 @@ bool cache_provider::is_location_in_los(coord x, coord y, owner_id owner) {
 	unique_lock<recursive_mutex> lck(this->mtx);
 	for (x = start_x; x < end_x; x++) {
 		for (y = start_y; y < end_y; y++) {
-			map_object* current = this->get_loc(x, y);
+			owned_obj* current = dynamic_cast<owned_obj*>(this->get_loc(x, y));
 			if (current && current->owner == owner) {
 				return true;
 			}
