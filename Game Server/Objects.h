@@ -8,13 +8,6 @@
 
 namespace game_server {
 	namespace objects {
-		template<typename T> struct dependent {
-			T& parent;
-
-			exported dependent(T& parent) : parent(parent) {}
-			exported virtual ~dependent() = 0 {}
-		};
-
 		struct updatable {
 			exported updatable();
 			exported virtual ~updatable() = 0;
