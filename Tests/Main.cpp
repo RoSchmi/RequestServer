@@ -6,6 +6,7 @@
 #include "../Game Server/Objects.h"
 #include "../Game Server/CacheProvider.h"
 #include "../Game Server/ProcessorNode.h"
+#include "../Game Server/Updater.h"
 
 using namespace game_server;
 using namespace util;
@@ -30,6 +31,8 @@ int main(int argc, char **argv) {
 	cache_provider cache(0, 0, 0, 0, 0);
 	obj o;
 	unique_ptr<obj> p;
+	updater qux(0, chrono::milliseconds(5));
+	cache_updater bar(cache, 0, chrono::milliseconds(5));
 
 	cache.add(o);
 	cache.remove(o);

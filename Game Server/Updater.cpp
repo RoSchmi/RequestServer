@@ -26,8 +26,8 @@ void updater::tick() {
 
 	for (word i = 0; i < this->updates_per_tick && i + this->position < this->objects.size(); i++) {
 		auto now = date_time::clock::now();
-		word delta = chrono::duration_cast<chrono::milliseconds>(now - this->objects[i]->last_updated).count();
-		this->objects[i]->update(delta);
+		int64 delta = chrono::duration_cast<chrono::milliseconds>(now - this->objects[i]->last_updated).count();
+		this->objects[i]->update(static_cast<uint64>(delta));
 		this->objects[i]->last_updated = now;
 	}
 }
@@ -62,8 +62,8 @@ void cache_updater::tick() {
 			return;
 
 		auto now = date_time::clock::now();
-		word delta = chrono::duration_cast<chrono::milliseconds>(now - object->last_updated).count();
-		object->update(delta);
+		int64 delta = chrono::duration_cast<chrono::milliseconds>(now - object->last_updated).count();
+		object->update(static_cast<uint64>(delta));
 		object->last_updated = now;
 	}
 }

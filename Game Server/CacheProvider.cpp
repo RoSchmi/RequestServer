@@ -51,6 +51,10 @@ updatable* cache_provider::get_next_updatable(word position) {
 
 void cache_provider::add_internal(base_obj* object) {
 	this->id_idx[object->id] = object;
+
+	auto as_updatable = dynamic_cast<updatable*>(object);
+	if (as_updatable)
+		this->updatable_idx.push_back(as_updatable);
 }
 
 bool cache_provider::add_internal(map_obj* object) {
@@ -67,11 +71,18 @@ bool cache_provider::add_internal(map_obj* object) {
 }
 
 void cache_provider::add_internal(owned_obj* object) {
-	this->owner_idx[object->owner][object->id] = object;
+	this->owner_idx[object->owner].push_back(object);
 }
 
 void cache_provider::remove_internal(base_obj* object) {
 	this->id_idx.erase(object->id);
+
+	auto as_updatable = dynamic_cast<updatable*>(object);
+	if (as_updatable) {
+		auto iter = find(this->updatable_idx.begin(), this->updatable_idx.end(), as_updatable);
+		if (iter != this->updatable_idx.end())
+			this->updatable_idx.erase(iter);
+	}
 }
 
 void cache_provider::remove_internal(map_obj* object) {
