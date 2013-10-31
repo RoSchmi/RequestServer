@@ -19,7 +19,7 @@ namespace game_server {
 			exported updatable();
 			exported virtual ~updatable() = 0;
 
-			exported virtual void update() = 0;
+			exported virtual void update(word delta) = 0;
 
 			date_time last_updated;
 		};

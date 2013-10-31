@@ -42,6 +42,13 @@ void cache_provider::end_update() {
 	this->unlock();
 }
 
+updatable* cache_provider::get_next_updatable(word position) {
+	if (this->lock_holder != this_thread::get_id())
+		throw sql::synchronization_exception();
+
+	return position < this->updatable_idx.size() ? this->updatable_idx[position] : nullptr;
+}
+
 void cache_provider::add_internal(base_obj* object) {
 	this->id_idx[object->id] = object;
 }

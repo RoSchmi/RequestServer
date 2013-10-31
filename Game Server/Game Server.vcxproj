@@ -14,6 +14,7 @@
     <ClCompile Include="Objects.cpp" />
     <ClCompile Include="CacheProvider.cpp" />
     <ClCompile Include="ProcessorNode.cpp" />
+    <ClCompile Include="Updater.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BrokerNode.h" />
@@ -21,6 +22,7 @@
     <ClInclude Include="ProcessorNode.h" />
     <ClInclude Include="Objects.h" />
     <ClInclude Include="CacheProvider.h" />
+    <ClInclude Include="Updater.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="CMakeLists.txt" />

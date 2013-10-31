@@ -26,7 +26,8 @@ namespace game_server {
 
 		std::thread::id lock_holder;
 		std::recursive_mutex mtx;
-		
+
+		std::vector<objects::updatable*> updatable_idx;
 		std::unordered_map<obj_id, objects::base_obj*> id_idx;
 		std::unordered_map<owner_id, std::vector<objects::owned_obj*>> owner_idx;
 		std::unordered_map<coord, std::unordered_map<coord, objects::map_obj*>> loc_idx;
@@ -39,6 +40,10 @@ namespace game_server {
 		void remove_internal(objects::base_obj* object);
 		void remove_internal(objects::map_obj* object);
 		void remove_internal(objects::owned_obj* object);
+
+		objects::updatable* get_next_updatable(word position);
+
+		friend class cache_updater;
 		
 		public:
 			cache_provider(const cache_provider& other) = delete;
