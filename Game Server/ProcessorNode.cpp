@@ -6,7 +6,7 @@ using namespace util::net;
 using namespace game_server;
 
 processor_node::processor_node(libconfig::Setting& settings, obj_id area_id) {
-	this->workers = settings["workers"];
+	this->workers = static_cast<uint32>(settings["workers"]);
 	this->area_id = area_id;
 
 	this->server = request_server(std::vector<std::string> { settings["tcp_port"].c_str(), settings["ws_port"].c_str() }, this->workers, result_codes::retry_later, std::vector<bool> { false, true });

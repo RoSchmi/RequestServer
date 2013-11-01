@@ -81,7 +81,7 @@ namespace game_server {
 			template<typename T> exported void add(T& type) {
 				static_assert(std::is_base_of<objects::base_obj, T>::value, "typename T must derive from objects::base_obj.");
 
-				unique_lock<recursive_mutex> lck(this->mtx);
+				std::unique_lock<std::recursive_mutex> lck(this->mtx);
 
 				objects::base_obj* as_base = type.clone();
 				objects::map_obj* as_map = dynamic_cast<objects::map_obj*>(as_base);
@@ -103,7 +103,7 @@ namespace game_server {
 			template<typename T> exported void remove(T& type) {
 				static_assert(std::is_base_of<objects::base_obj, T>::value, "typename T must derive from objects::base_obj.");
 
-				unique_lock<recursive_mutex> lck(this->mtx);
+				std::unique_lock<std::recursive_mutex> lck(this->mtx);
 
 				objects::base_obj* as_base = this->id_idx[type.id];
 
