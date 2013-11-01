@@ -10,6 +10,10 @@ using namespace game_server;
 using namespace game_server::objects;
 
 cache_provider::cache_provider(coord start_x, coord start_y, size width, size height, size los_radius) {
+	this->set_bounds(start_x, start_y, width, height, los_radius);
+}
+
+void cache_provider::set_bounds(coord start_x, coord start_y, size width, size height, size los_radius) {
 	this->start_x = start_x;
 	this->start_y = start_y;
 	this->end_x = start_x + width;

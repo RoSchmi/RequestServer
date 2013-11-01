@@ -50,9 +50,12 @@ namespace game_server {
 			cache_provider(cache_provider&& other) = delete;
 			cache_provider& operator=(cache_provider&& other) = delete;
 			cache_provider& operator=(const cache_provider& other) = delete;
-		
+
 			exported cache_provider(coord start_x, coord start_y, size width, size height, size los_radius);
+			exported cache_provider() = default;
 			exported virtual ~cache_provider();
+
+			exported void set_bounds(coord start_x, coord start_y, size width, size height, size los_radius);
 
 			exported void lock();
 			exported void unlock();
