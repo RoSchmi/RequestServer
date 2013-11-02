@@ -12,16 +12,10 @@ processor_node::processor_node(word workers, endpoint ep, endpoint broker_ep, ob
 processor_node::processor_node(word workers, vector<endpoint> eps, endpoint broker_ep, obj_id area_id) : server(eps, workers, result_codes::retry_later) {
 	this->workers = workers;
 	this->area_id = area_id;
+	this->broker_ep = broker_ep;
 
 	this->server.on_disconnect += std::bind(&processor_node::on_disconnect, this, std::placeholders::_1);
 	this->server.on_request += std::bind(&processor_node::on_request, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6);
-
-	if (this->area_id != 0) {
-		this->broker = this->server.adopt(tcp_connection(broker_ep));
-		this->broker->state = reinterpret_cast<void*>(this->area_id);
-		this->authenticated_clients[this->area_id].push_back(this->broker.value());
-		this->send_to_broker(this->area_id, this->create_message(0x00, 0x00));
-	}
 }
 
 processor_node::~processor_node() {
@@ -30,6 +24,13 @@ processor_node::~processor_node() {
 
 void processor_node::start() {
 	this->server.start();
+
+	if (this->area_id != 0) {
+		this->broker = this->server.adopt(tcp_connection(broker_ep));
+		this->broker->state = reinterpret_cast<void*>(this->area_id);
+		this->authenticated_clients[this->area_id].push_back(this->broker.value());
+		this->send_to_broker(this->area_id, this->create_message(0x00, 0x00));
+	}
 }
 
 void processor_node::add_client(obj_id id, tcp_connection& conn) {

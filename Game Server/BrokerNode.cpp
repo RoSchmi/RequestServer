@@ -14,7 +14,10 @@ broker_node::broker_node(word workers, endpoint ep) : processor_node(workers, ep
 }
 
 void broker_node::on_disconnect(tcp_connection& client) {
-	this->authenticated_clients.erase(reinterpret_cast<obj_id>(client.state));
+	auto id = reinterpret_cast<obj_id>(client.state);
+	if (this->authenticated_clients.count(id) != 0)
+		this->authenticated_clients.erase(id);
+	processor_node::on_disconnect(client);
 }
 
 request_server::request_result broker_node::on_request(tcp_connection& client, word worker_number, uint8 category, uint8 method, data_stream& parameters, data_stream& response) {
