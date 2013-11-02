@@ -29,17 +29,15 @@ namespace game_server {
 
 		std::vector<objects::updatable*> updatable_idx;
 		std::unordered_map<obj_id, objects::base_obj*> id_idx;
-		std::unordered_map<owner_id, std::vector<objects::owned_obj*>> owner_idx;
+		std::unordered_map<owner_id, std::vector<objects::base_obj*>> owner_idx;
 		std::unordered_map<coord, std::unordered_map<coord, objects::map_obj*>> loc_idx;
 
 		objects::map_obj*& get_loc(coord x, coord y);
 
 		void add_internal(objects::base_obj* object);
 		bool add_internal(objects::map_obj* object);
-		void add_internal(objects::owned_obj* object);
 		void remove_internal(objects::base_obj* object);
 		void remove_internal(objects::map_obj* object);
-		void remove_internal(objects::owned_obj* object);
 
 		objects::updatable* get_next_updatable(word position);
 
@@ -69,7 +67,7 @@ namespace game_server {
 			exported std::vector<std::unique_ptr<objects::map_obj>> get_in_area(coord x, coord y, size width = 1, size height = 1);
 			exported std::vector<obj_id> get_users_with_los_at(coord x, coord y);
 
-			exported std::vector<std::unique_ptr<objects::owned_obj>> get_by_owner(owner_id owner);
+			exported std::vector<std::unique_ptr<objects::base_obj>> get_by_owner(owner_id owner);
 			exported std::vector<std::unique_ptr<objects::map_obj>> get_in_owner_los(owner_id owner);
 			exported std::vector<std::unique_ptr<objects::map_obj>> get_in_owner_los(owner_id owner, coord x, coord y, size width, size height);
 
@@ -83,19 +81,16 @@ namespace game_server {
 
 				std::unique_lock<std::recursive_mutex> lck(this->mtx);
 
-				objects::base_obj* as_base = type.clone();
-				objects::map_obj* as_map = dynamic_cast<objects::map_obj*>(as_base);
-				objects::owned_obj* as_owned = dynamic_cast<objects::owned_obj*>(as_base);
+				T* new_obj = type.clone();
+				objects::base_obj* as_base = new_obj;
+				objects::map_obj* as_map = dynamic_cast<objects::map_obj*>(new_obj);
 
 				if (as_map) {
 					if (!this->add_internal(as_map)) {
-						delete as_base;
+						delete new_obj;
 						throw util::sql::synchronization_exception();
 					}
 				}
-
-				if (as_owned)
-					this->add_internal(as_owned);
 
 				this->add_internal(as_base);
 			}
@@ -111,13 +106,9 @@ namespace game_server {
 					throw util::sql::synchronization_exception();
 
 				objects::map_obj* as_map = dynamic_cast<objects::map_obj*>(as_base);
-				objects::owned_obj* as_owned = dynamic_cast<objects::owned_obj*>(as_base);
 
 				if (as_map)
 					this->remove_internal(as_map);
-
-				if (as_owned)
-					this->remove_internal(as_owned);
 
 				this->remove_internal(as_base);
 			}
@@ -145,11 +136,9 @@ namespace game_server {
 
 				objects::base_obj* orig = this->id_idx[object.id];
 				objects::map_obj* orig_as_map = dynamic_cast<objects::map_obj*>(orig);
-				objects::owned_obj* orig_as_owned = dynamic_cast<objects::owned_obj*>(orig);
 				objects::map_obj* obj_as_map = dynamic_cast<objects::map_obj*>(&object);
-				objects::owned_obj* obj_as_owned = dynamic_cast<objects::owned_obj*>(&object);
 				bool loc_changed = obj_as_map && (obj_as_map->x != orig_as_map->x || obj_as_map->y != orig_as_map->y);
-				bool own_changed = obj_as_owned && (obj_as_owned->owner != orig_as_owned->owner);
+				bool own_changed = orig->owner != object.owner;
 
 				if (orig->last_updated_by_cache != object.last_updated_by_cache)
 					throw util::sql::synchronization_exception();
@@ -166,7 +155,7 @@ namespace game_server {
 					this->remove_internal(orig_as_map);
 
 				if (own_changed)
-					this->remove_internal(orig_as_owned);
+					this->remove_internal(orig);
 
 				*orig = object;
 
@@ -174,7 +163,7 @@ namespace game_server {
 					this->add_internal(orig_as_map);
 
 				if (own_changed)
-					this->add_internal(orig_as_owned);
+					this->add_internal(orig);
 			}
 
 			template<typename T> exported void update(std::unique_ptr<T>& object) {

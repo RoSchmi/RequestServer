@@ -56,6 +56,8 @@ updatable* cache_provider::get_next_updatable(word position) {
 void cache_provider::add_internal(base_obj* object) {
 	this->id_idx[object->id] = object;
 
+	this->owner_idx[object->owner].push_back(object);
+
 	auto as_updatable = dynamic_cast<updatable*>(object);
 	if (as_updatable)
 		this->updatable_idx.push_back(as_updatable);
@@ -74,12 +76,15 @@ bool cache_provider::add_internal(map_obj* object) {
 	return true;
 }
 
-void cache_provider::add_internal(owned_obj* object) {
-	this->owner_idx[object->owner].push_back(object);
-}
-
 void cache_provider::remove_internal(base_obj* object) {
 	this->id_idx.erase(object->id);
+
+	if (object->owner != 0) {
+		auto& owner = this->owner_idx[object->owner];
+		auto iter = find(owner.begin(), owner.end(), object);
+		if (iter != owner.end())
+			owner.erase(iter);
+	}
 
 	auto as_updatable = dynamic_cast<updatable*>(object);
 	if (as_updatable) {
@@ -93,13 +98,6 @@ void cache_provider::remove_internal(map_obj* object) {
 	for (coord x = object->x; x < object->x + object->width; x++)
 		for (coord y = object->y; y < object->y + object->height; y++)
 			this->get_loc(x, y) = nullptr;
-}
-
-void cache_provider::remove_internal(owned_obj* object) {
-	auto& owner = this->owner_idx[object->owner];
-	auto iter = find(owner.begin(), owner.end(), object);
-	if (iter != owner.end())
-		owner.erase(iter);
 }
 
 map_obj*& cache_provider::get_loc(coord x, coord y) {
@@ -119,7 +117,7 @@ unique_ptr<base_obj> cache_provider::get_by_id(obj_id search_id) {
 	if (this->id_idx.count(search_id) == 0)
 		return nullptr;
 
-	return unique_ptr<base_obj>(this->id_idx[search_id]->clone_as<base_obj>());
+	return unique_ptr<base_obj>(this->id_idx[search_id]->clone());
 }
 
 unique_ptr<map_obj> cache_provider::get_at_location(coord x, coord y) {
@@ -127,7 +125,7 @@ unique_ptr<map_obj> cache_provider::get_at_location(coord x, coord y) {
 
 	auto obj = this->get_loc(x, y);
 	if (obj)
-		return unique_ptr<map_obj>(obj->clone_as<map_obj>());
+		return unique_ptr<map_obj>(obj->clone());
 	else
 		return unique_ptr<map_obj>();
 }
@@ -144,20 +142,20 @@ vector<unique_ptr<map_obj>> cache_provider::get_in_area(coord x, coord y, size w
 		for (y = end_y - height; y < end_y; y++) {
 			map_obj* current = this->get_loc(x, y);
 			if (current)
-				result.emplace_back(current->clone_as<map_obj>());
+				result.emplace_back(current->clone());
 		}
 	}
 
 	return result;
 }
 
-vector<unique_ptr<owned_obj>> cache_provider::get_by_owner(owner_id owner) {
-	vector<unique_ptr<owned_obj>> result;
+vector<unique_ptr<base_obj>> cache_provider::get_by_owner(owner_id owner) {
+	vector<unique_ptr<base_obj>> result;
 
 	unique_lock<recursive_mutex> lck(this->mtx);
 	if (this->owner_idx.count(owner) != 0)
 		for (auto i : this->owner_idx[owner])
-			result.emplace_back(i->clone_as<owned_obj>());
+			result.emplace_back(i->clone());
 
 	return result;
 }
@@ -169,8 +167,7 @@ vector<unique_ptr<map_obj>> cache_provider::get_in_owner_los(owner_id owner) {
 	if (this->owner_idx.count(owner) == 0)
 		return result;
 
-	vector<owned_obj*> owner_objects = this->owner_idx[owner];
-	
+	auto& owner_objects = this->owner_idx[owner];
 	coord start_x, start_y, end_x, end_y, x, y;
 	for (auto object : owner_objects) {
 		auto current_object = dynamic_cast<map_obj*>(object);
@@ -188,7 +185,7 @@ vector<unique_ptr<map_obj>> cache_provider::get_in_owner_los(owner_id owner) {
 			for (y = start_y; y < end_y; y++) {
 				auto current_test_object = this->get_loc(x, y);
 				if (current_test_object)
-					result.emplace_back(current_test_object->clone_as<map_obj>());
+					result.emplace_back(current_test_object->clone());
 			}
 		}
 	}
@@ -218,8 +215,8 @@ vector<obj_id> cache_provider::get_users_with_los_at(coord x, coord y) {
 	unique_lock<recursive_mutex> lck(this->mtx);
 	for (coord this_x = start_x; this_x < end_x; this_x++) {
 		for (coord this_y = start_y; this_y < end_y; this_y++) {
-			owned_obj* current = dynamic_cast<owned_obj*>(this->get_loc(this_x, this_y));
-			if (current)
+			auto* current = this->get_loc(this_x, this_y);
+			if (current && current->owner != 0)
 				result.push_back(current->owner);
 		}
 	}
@@ -253,7 +250,7 @@ bool cache_provider::is_location_in_los(coord x, coord y, owner_id owner) {
 	unique_lock<recursive_mutex> lck(this->mtx);
 	for (x = start_x; x < end_x; x++) {
 		for (y = start_y; y < end_y; y++) {
-			owned_obj* current = dynamic_cast<owned_obj*>(this->get_loc(x, y));
+			auto current = this->get_loc(x, y);
 			if (current && current->owner == owner) {
 				return true;
 			}

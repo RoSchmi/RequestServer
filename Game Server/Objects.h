@@ -18,10 +18,12 @@ namespace game_server {
 		};
 
 		struct base_obj : public util::sql::object<obj_id> {
-			exported base_obj();
+			typedef uint8 object_type;
+
+			exported base_obj(object_type type);
 			exported virtual ~base_obj() = 0;
 
-			template<typename T> exported T* clone_as() const {
+			template<typename T> exported T* clone_as1() const {
 				static_assert(std::is_base_of<base_obj, T>::value, "typename T must be derived from base_obj.");
 
 				return dynamic_cast<T*>(this->clone());
@@ -29,28 +31,22 @@ namespace game_server {
 
 			exported virtual base_obj* clone() const = 0;
 
-			uint8 obj_type;
+			object_type obj_type;
 			date_time last_updated_by_cache;
+			owner_id owner;
 		};
 
-		struct map_obj : virtual public base_obj {
+		struct map_obj : public base_obj {
+			exported map_obj(base_obj::object_type obj_type);
 			exported virtual ~map_obj() = 0;
+
+			exported virtual map_obj* clone() const = 0;
 
 			obj_id planet_id;
 			coord x;
 			coord y;
 			size width;
 			size height;
-		};
-
-		struct owned_obj : virtual public base_obj {
-			exported virtual ~owned_obj() = 0;
-
-			owner_id owner;
-		};
-
-		struct map_owned_obj : public map_obj, public owned_obj {
-			exported virtual ~map_owned_obj() = 0;
 		};
 	}
 }
