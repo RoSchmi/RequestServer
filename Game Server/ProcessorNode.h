@@ -77,7 +77,7 @@ namespace game_server {
 					exported virtual result_code process(obj_id& user_id, T& db) = 0;
 			};
 
-			typedef std::function<std::unique_ptr<T>(word, util::sql::connection::parameters&)> context_creator;
+			typedef std::function<std::unique_ptr<T>(word)> context_creator;
 
 			processor_node_db(const processor_node_db& other) = delete;
 			processor_node_db(processor_node_db&& other) = delete;
