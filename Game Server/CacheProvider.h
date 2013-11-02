@@ -44,7 +44,7 @@ namespace game_server {
 		objects::updatable* get_next_updatable(word position);
 
 		friend class cache_updater;
-		
+
 		public:
 			cache_provider(const cache_provider& other) = delete;
 			cache_provider(cache_provider&& other) = delete;
@@ -108,7 +108,7 @@ namespace game_server {
 				objects::base_obj* as_base = this->id_idx[type.id];
 
 				if (type.last_updated_by_cache != as_base->last_updated_by_cache)
-					throw sql::synchronization_exception();
+					throw util::sql::synchronization_exception();
 
 				objects::map_obj* as_map = dynamic_cast<objects::map_obj*>(as_base);
 				objects::owned_obj* as_owned = dynamic_cast<objects::owned_obj*>(as_base);
@@ -153,7 +153,7 @@ namespace game_server {
 
 				if (orig->last_updated_by_cache != object.last_updated_by_cache)
 					throw util::sql::synchronization_exception();
-								
+
 				if (loc_changed)
 					for (coord x = obj_as_map->x; x < obj_as_map->x + obj_as_map->width; x++)
 						for (coord y = obj_as_map->y; y < obj_as_map->y + obj_as_map->height; y++)
