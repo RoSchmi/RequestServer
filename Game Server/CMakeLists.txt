@@ -9,8 +9,9 @@ add_library(GameServerObjects OBJECT ${game_sources})
 add_library(GameServer SHARED $<TARGET_OBJECTS:GameServerObjects>)
 add_library(GameServerStatic STATIC $<TARGET_OBJECTS:GameServerObjects>)
 
-set(CMAKE_CXX_FLAGS "-std=c++11 -fPIC -Wall -pedantic -Wno-overloaded-virtual ${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "-std=c++11 -stdlib=libc++ -fPIC -Wall -pedantic -Wno-overloaded-virtual ${CMAKE_CXX_FLAGS}")
 
+set(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} -lc++abi")
 find_package(Threads REQUIRED)
 find_package(PostgreSQL REQUIRED)
 find_package(PkgConfig REQUIRED)
