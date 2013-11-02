@@ -47,6 +47,9 @@ void processor_node::del_client(obj_id id, tcp_connection& conn) {
 	if (id == 0)
 		return;
 
+	if (id == this->area_id)
+		throw broker_node_down_exception();
+
 	std::unique_lock<std::mutex> lck(this->clients_lock);
 
 	auto i = this->authenticated_clients.find(id);

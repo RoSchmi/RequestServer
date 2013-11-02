@@ -28,6 +28,8 @@ namespace game_server {
 					exported virtual void serialize(util::data_stream& response) = 0;
 			};
 
+			class broker_node_down_exception {};
+
 			processor_node(const processor_node& other) = delete;
 			processor_node(processor_node&& other) = delete;
 			processor_node& operator=(processor_node&& other) = delete;
