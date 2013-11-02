@@ -9,8 +9,6 @@
 #include <algorithm>
 #include <type_traits>
 
-#include <libconfig.h++>
-
 #include <Utilities/Common.h>
 #include <Utilities/Optional.h>
 #include <Utilities/SQL/Database.h>
@@ -48,8 +46,9 @@ namespace game_server {
 			void add_client(obj_id id, util::net::tcp_connection& conn);
 			void del_client(obj_id id, util::net::tcp_connection& conn);
 
-		public:
-			exported processor_node(libconfig::Setting& settings, obj_id area_id = 0);
+	public:
+			exported processor_node(word workers, util::net::endpoint ep, util::net::endpoint broker_ep = util::net::endpoint(), obj_id area_id = 0);
+			exported processor_node(word workers, std::vector<util::net::endpoint> eps, util::net::endpoint broker_ep = util::net::endpoint(), obj_id area_id = 0);
 			exported virtual ~processor_node();
 
 			exported void start();
@@ -89,11 +88,9 @@ namespace game_server {
 			std::vector<std::unique_ptr<T>> dbs;
 
 		public:
-			exported processor_node_db(libconfig::Setting& settings, context_creator ctx_creator, obj_id area_id = 0) : processor_node(settings, area_id) {
-				util::sql::connection::parameters paras = { settings["db"]["host"].c_str(), settings["db"]["port"].c_str(), settings["db"]["dbname"].c_str(), settings["db"]["role"].c_str(), settings["db"]["password"].c_str() };
-
+			exported processor_node_db(context_creator ctx_creator, word workers, std::vector<util::net::endpoint> eps, util::net::endpoint broker_ep = util::net::endpoint(), obj_id area_id = 0) : processor_node(workers, eps, broker_ep, area_id) {
 				for (word i = 0; i < this->workers; i++)
-					this->dbs.emplace_back(std::move(ctx_creator(i, paras)));
+					this->dbs.emplace_back(std::move(ctx_creator(i)));
 			}
 
 			exported virtual ~processor_node_db() {

@@ -16,7 +16,7 @@ namespace game_server {
 			broker_node& operator=(broker_node&& other) = delete;
 			broker_node& operator=(const broker_node& other) = delete;
 	
-			exported broker_node(libconfig::Setting& settings);
+			exported broker_node(word workers, util::net::endpoint ep);
 			exported virtual ~broker_node() = default;
 	};
 }

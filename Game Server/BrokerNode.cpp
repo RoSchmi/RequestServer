@@ -9,7 +9,7 @@ using namespace util;
 using namespace util::net;
 using namespace game_server;
 
-broker_node::broker_node(libconfig::Setting& settings) : processor_node(settings) {
+broker_node::broker_node(word workers, endpoint ep) : processor_node(workers, ep) {
 
 }
 

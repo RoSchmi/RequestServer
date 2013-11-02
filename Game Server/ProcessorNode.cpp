@@ -5,16 +5,19 @@ using namespace util;
 using namespace util::net;
 using namespace game_server;
 
-processor_node::processor_node(libconfig::Setting& settings, obj_id area_id) {
-	this->workers = static_cast<uint32>(settings["workers"]);
+processor_node::processor_node(word workers, endpoint ep, endpoint broker_ep, obj_id area_id) : processor_node(workers, vector<endpoint> { ep }, broker_ep, area_id) {
+
+}
+
+processor_node::processor_node(word workers, vector<endpoint> eps, endpoint broker_ep, obj_id area_id) : server(eps, workers, result_codes::retry_later) {
+	this->workers = workers;
 	this->area_id = area_id;
 
-	this->server = request_server(std::vector<std::string> { settings["tcp_port"].c_str(), settings["ws_port"].c_str() }, this->workers, result_codes::retry_later, std::vector<bool> { false, true });
 	this->server.on_disconnect += std::bind(&processor_node::on_disconnect, this, std::placeholders::_1);
 	this->server.on_request += std::bind(&processor_node::on_request, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6);
 
 	if (this->area_id != 0) {
-		this->broker = this->server.adopt(tcp_connection(settings["broker_address"].c_str(), settings["broker_port"].c_str()));
+		this->broker = this->server.adopt(tcp_connection(broker_ep));
 		this->broker->state = reinterpret_cast<void*>(this->area_id);
 		this->authenticated_clients[this->area_id].push_back(this->broker.value());
 		this->send_to_broker(this->area_id, this->create_message(0x00, 0x00));
@@ -48,7 +51,7 @@ void processor_node::del_client(obj_id id, tcp_connection& conn) {
 	auto i = this->authenticated_clients.find(id);
 	if (i != this->authenticated_clients.end()) {
 		auto& list = i->second;
-		auto j = find_if(list.begin(), list.end(), [&conn](std::reference_wrapper<tcp_connection> ref) { return &ref.get() == &conn; });
+		auto j = find_if(list.begin(), list.end(), [&conn](reference_wrapper<tcp_connection> ref) { return &ref.get() == &conn; });
 
 		list.erase(j);
 
