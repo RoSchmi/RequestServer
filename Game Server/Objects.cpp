@@ -22,7 +22,10 @@ base_obj::~base_obj() {
 }
 
 map_obj::map_obj(obj_type object_type) : base_obj(object_type) {
-
+	this->x = 0;
+	this->y = 0;
+	this->width = 1;
+	this->height = 1;
 }
 
 map_obj::~map_obj() {
