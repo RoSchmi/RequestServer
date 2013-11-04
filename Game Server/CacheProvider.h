@@ -76,10 +76,26 @@ namespace game_server {
 			exported bool is_location_in_bounds(coord x, coord y, size width = 1, size height = 1);
 			exported bool is_user_present(obj_id user_id);
 
-			template<typename T> exported void add(T& type) {
+			template<typename T> exported T get_by_id(obj_id search_id) {
 				static_assert(std::is_base_of<objects::base_obj, T>::value, "typename T must derive from objects::base_obj.");
 
 				std::unique_lock<std::recursive_mutex> lck(this->mtx);
+
+				if (this->id_idx.count(search_id) == 0)
+					return T();
+
+				T* result = dynamic_cast<T*>(this->id_idx[search_id]);
+				if (!result)
+					return T();
+
+				return T(*result);
+			}
+
+			template<typename T> exported void add(T& type) {
+				static_assert(std::is_base_of<objects::base_obj, T>::value, "typename T must derive from objects::base_obj.");
+
+				if (this->lock_holder != std::this_thread::get_id())
+					throw util::sql::synchronization_exception();
 
 				T* new_obj = type.clone();
 				objects::base_obj* as_base = new_obj;
@@ -98,7 +114,8 @@ namespace game_server {
 			template<typename T> exported void remove(T& type) {
 				static_assert(std::is_base_of<objects::base_obj, T>::value, "typename T must derive from objects::base_obj.");
 
-				std::unique_lock<std::recursive_mutex> lck(this->mtx);
+				if (this->lock_holder != std::this_thread::get_id())
+					throw util::sql::synchronization_exception();
 
 				objects::base_obj* as_base = this->id_idx[type.id];
 
@@ -111,21 +128,6 @@ namespace game_server {
 					this->remove_internal(as_map);
 
 				this->remove_internal(as_base);
-			}
-
-			template<typename T> exported T get_by_id(obj_id search_id) {
-				static_assert(std::is_base_of<objects::base_obj, T>::value, "typename T must derive from objects::base_obj.");
-
-				std::unique_lock<std::recursive_mutex> lck(this->mtx);
-
-				if (this->id_idx.count(search_id) == 0)
-					return T();
-
-				T* result = dynamic_cast<T*>(this->id_idx[search_id]);
-				if (!result)
-					return T();
-
-				return T(*result);
 			}
 
 			template<typename T> exported void update(T& object) {
@@ -166,10 +168,54 @@ namespace game_server {
 					this->add_internal(orig);
 			}
 
+			template<typename T> exported void add(std::unique_ptr<T>& object) {
+				static_assert(std::is_base_of<objects::base_obj, T>::value, "typename T must derive from objects::base_obj.");
+
+				this->add(*object);
+			}
+
+			template<typename T> exported void remove(std::unique_ptr<T>& object) {
+				static_assert(std::is_base_of<objects::base_obj, T>::value, "typename T must derive from objects::base_obj.");
+
+				this->remove(*object);
+			}
+
 			template<typename T> exported void update(std::unique_ptr<T>& object) {
 				static_assert(std::is_base_of<objects::base_obj, T>::value, "typename T must derive from objects::base_obj.");
 
 				this->update(*object);
+			}
+
+			template<typename T> exported void add_single(std::unique_ptr<T>& object) {
+				static_assert(std::is_base_of<objects::base_obj, T>::value, "typename T must derive from objects::base_obj.");
+
+				this->begin_update();
+				this->add(object);
+				this->end_update();
+			}
+
+			template<typename T> exported void add_single(T& object) {
+				static_assert(std::is_base_of<objects::base_obj, T>::value, "typename T must derive from objects::base_obj.");
+
+				this->begin_update();
+				this->add(object);
+				this->end_update();
+			}
+
+			template<typename T> exported void remove_single(std::unique_ptr<T>& object) {
+				static_assert(std::is_base_of<objects::base_obj, T>::value, "typename T must derive from objects::base_obj.");
+
+				this->begin_update();
+				this->add(object);
+				this->end_update();
+			}
+
+			template<typename T> exported void remove_single(T& object) {
+				static_assert(std::is_base_of<objects::base_obj, T>::value, "typename T must derive from objects::base_obj.");
+
+				this->begin_update();
+				this->add(object);
+				this->end_update();
 			}
 
 			template<typename T> exported void update_single(std::unique_ptr<T>& object) {
