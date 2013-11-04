@@ -1,6 +1,7 @@
 #pragma once
 
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <mutex>
 #include <utility>
@@ -33,6 +34,7 @@ namespace game_server {
 		std::unordered_map<coord, std::unordered_map<coord, objects::map_obj*>> loc_idx;
 
 		objects::map_obj*& get_loc(coord x, coord y);
+		bool is_root_object(objects::map_obj* obj, coord x, coord y);
 
 		void add_internal(objects::base_obj* object);
 		bool add_internal(objects::map_obj* object);
@@ -64,12 +66,12 @@ namespace game_server {
 
 			exported std::unique_ptr<objects::base_obj> get_by_id(obj_id search_id);
 			exported std::unique_ptr<objects::map_obj> get_at_location(coord x, coord y);
-			exported std::vector<std::unique_ptr<objects::map_obj>> get_in_area(coord x, coord y, size width = 1, size height = 1);
-			exported std::vector<obj_id> get_users_with_los_at(coord x, coord y);
+			exported std::unordered_map<obj_id, std::unique_ptr<objects::map_obj>> get_in_area(coord x, coord y, size width = 1, size height = 1);
+			exported std::unordered_set<obj_id> get_users_with_los_at(coord x, coord y);
 
-			exported std::vector<std::unique_ptr<objects::base_obj>> get_by_owner(owner_id owner);
-			exported std::vector<std::unique_ptr<objects::map_obj>> get_in_owner_los(owner_id owner);
-			exported std::vector<std::unique_ptr<objects::map_obj>> get_in_owner_los(owner_id owner, coord x, coord y, size width, size height);
+			exported std::unordered_map<obj_id, std::unique_ptr<objects::base_obj>> get_by_owner(owner_id owner);
+			exported std::unordered_map<obj_id, std::unique_ptr<objects::map_obj>> get_in_owner_los(owner_id owner);
+			exported std::unordered_map<obj_id, std::unique_ptr<objects::map_obj>> get_in_owner_los(owner_id owner, coord x, coord y, size width, size height);
 
 			exported bool is_area_empty(coord x, coord y, size width = 1, size height = 1);
 			exported bool is_location_in_los(coord x, coord y, owner_id owner);
