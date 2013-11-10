@@ -40,34 +40,35 @@ namespace game_server {
 			std::unordered_map<uint16, std::vector<std::unique_ptr<base_handler>>> unauthenticated_handlers;
 			util::net::request_server server;
 			util::net::endpoint broker_ep;
-			util::optional<util::net::tcp_connection&> broker;
-			std::unordered_map<obj_id, std::vector < std::reference_wrapper<util::net::tcp_connection>>> authenticated_clients;
+			std::shared_ptr<util::net::tcp_connection> broker;
+			std::unordered_map<obj_id, std::vector<std::shared_ptr<util::net::tcp_connection>>> authenticated_clients;
 			std::mutex clients_lock;
 			obj_id area_id;
 			word workers;
 
-			void add_client(obj_id id, util::net::tcp_connection& conn);
-			void del_client(obj_id id, util::net::tcp_connection& conn);
+			void add_client(obj_id id, std::shared_ptr<util::net::tcp_connection> conn);
+			void del_client(obj_id id, std::shared_ptr<util::net::tcp_connection> conn);
+
+			virtual void on_connect(std::shared_ptr<util::net::tcp_connection> client);
+			virtual void on_disconnect(std::shared_ptr<util::net::tcp_connection> client);
+			virtual util::net::request_server::request_result on_request(std::shared_ptr<util::net::tcp_connection> client, word worker_num, uint8 category, uint8 method, util::data_stream& parameters, util::data_stream& response);
 
 		public:
-				exported processor_node(word workers, util::net::endpoint ep, util::net::endpoint broker_ep = util::net::endpoint(), obj_id area_id = 0);
-				exported processor_node(word workers, std::vector<util::net::endpoint> eps, util::net::endpoint broker_ep = util::net::endpoint(), obj_id area_id = 0);
-				exported virtual ~processor_node();
+			exported processor_node(word workers, util::net::endpoint ep, util::net::endpoint broker_ep = util::net::endpoint(), obj_id area_id = 0);
+			exported processor_node(word workers, std::vector<util::net::endpoint> eps, util::net::endpoint broker_ep = util::net::endpoint(), obj_id area_id = 0);
+			exported virtual ~processor_node();
 
-				exported void start();
-				exported void send(obj_id receipient_id, util::data_stream notification);
-				exported void send_to_broker(obj_id target_id, util::data_stream message);
-				exported util::data_stream create_message(uint8 category, uint8 type);
-				exported virtual void on_connect(util::net::tcp_connection& client);
-				exported virtual void on_disconnect(util::net::tcp_connection& client);
-				exported virtual util::net::request_server::request_result on_request(util::net::tcp_connection& client, word worker_num, uint8 category, uint8 method, util::data_stream& parameters, util::data_stream& response);
+			exported void start();
+			exported void send(obj_id receipient_id, util::data_stream notification);
+			exported void send_to_broker(obj_id target_id, util::data_stream message);
+			exported util::data_stream create_message(uint8 category, uint8 type);
 
-				template<typename T> exported void register_handler(uint8 category, uint8 method, bool authenticated) {
-					static_assert(std::is_base_of<base_handler, T>::value, "typename T must derive from base_handler.");
+			template<typename T> exported void register_handler(uint8 category, uint8 method, bool authenticated) {
+				static_assert(std::is_base_of<base_handler, T>::value, "typename T must derive from base_handler.");
 
-					for (word i = 0; i < this->workers; i++)
-						(authenticated ? this->authenticated_handlers : this->unauthenticated_handlers)[(category << 8) | method].emplace_back(new T());
-				}
+				for (word i = 0; i < this->workers; i++)
+					(authenticated ? this->authenticated_handlers : this->unauthenticated_handlers)[(category << 8) | method].emplace_back(new T());
+			}
 	};
 
 	template<typename T> class processor_node_db : public processor_node {
@@ -98,9 +99,9 @@ namespace game_server {
 
 			exported virtual ~processor_node_db() = default;
 
-			exported virtual util::net::request_server::request_result on_request(util::net::tcp_connection& client, word worker_num, uint8 category, uint8 method, util::data_stream& parameters, util::data_stream& response) override {
+			exported virtual util::net::request_server::request_result on_request(std::shared_ptr<util::net::tcp_connection> client, word worker_num, uint8 category, uint8 method, util::data_stream& parameters, util::data_stream& response) override {
 				result_code result = result_codes::success;
-				obj_id authenticated_id = reinterpret_cast<obj_id>(client.state);
+				obj_id authenticated_id = reinterpret_cast<obj_id>(client->state);
 				obj_id start_id = authenticated_id;
 				uint16 type = (category << 8) | method;
 				T& context = *this->dbs[worker_num].get();

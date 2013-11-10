@@ -28,22 +28,22 @@ void processor_node::start() {
 	if (this->area_id != 0) {
 		this->broker = this->server.adopt(tcp_connection(broker_ep));
 		this->broker->state = reinterpret_cast<void*>(this->area_id);
-		this->authenticated_clients[this->area_id].push_back(this->broker.value());
+		this->authenticated_clients[this->area_id].push_back(this->broker);
 		this->send_to_broker(this->area_id, this->create_message(0x00, 0x00));
 	}
 }
 
-void processor_node::add_client(obj_id id, tcp_connection& conn) {
+void processor_node::add_client(obj_id id, shared_ptr<tcp_connection> conn) {
 	if (id == 0)
 		return;
 
 	std::unique_lock<std::mutex> lck(this->clients_lock);
 
-	conn.state = reinterpret_cast<void*>(id);
+	conn->state = reinterpret_cast<void*>(id);
 	this->authenticated_clients[id].push_back(conn);
 }
 
-void processor_node::del_client(obj_id id, tcp_connection& conn) {
+void processor_node::del_client(obj_id id, shared_ptr<tcp_connection> conn) {
 	if (id == 0)
 		return;
 
@@ -55,7 +55,7 @@ void processor_node::del_client(obj_id id, tcp_connection& conn) {
 	auto i = this->authenticated_clients.find(id);
 	if (i != this->authenticated_clients.end()) {
 		auto& list = i->second;
-		auto j = find_if(list.begin(), list.end(), [&conn](reference_wrapper<tcp_connection> ref) { return &ref.get() == &conn; });
+		auto j = find(list.begin(), list.end(), conn);
 
 		list.erase(j);
 
@@ -70,12 +70,12 @@ void processor_node::send(obj_id receipient_id, data_stream notification) {
 	auto iter = this->authenticated_clients.find(receipient_id);
 	if (iter != this->authenticated_clients.end())
 		for (auto i : iter->second)
-			this->server.enqueue_outgoing(request_server::message(i.get(), std::move(notification)));
+			this->server.enqueue_outgoing(request_server::message(i, notification));
 }
 
 void processor_node::send_to_broker(obj_id target_id, data_stream message) {
 	message.write(target_id);
-	this->server.enqueue_outgoing(request_server::message(*this->broker, std::move(message)));
+	this->server.enqueue_outgoing(request_server::message(this->broker, std::move(message)));
 }
 
 data_stream processor_node::create_message(uint8 category, uint8 type) {
@@ -84,17 +84,17 @@ data_stream processor_node::create_message(uint8 category, uint8 type) {
 	return notification;
 }
 
-void processor_node::on_connect(tcp_connection& client) {
+void processor_node::on_connect(shared_ptr<tcp_connection> client) {
 
 }
 
-void processor_node::on_disconnect(tcp_connection& client) {
-	this->del_client(reinterpret_cast<obj_id>(client.state), client);
+void processor_node::on_disconnect(shared_ptr<tcp_connection> client) {
+	this->del_client(reinterpret_cast<obj_id>(client->state), client);
 }
 
-request_server::request_result processor_node::on_request(tcp_connection& client, word worker_num, uint8 category, uint8 method, data_stream& parameters, data_stream& response) {
+request_server::request_result processor_node::on_request(shared_ptr<tcp_connection> client, word worker_num, uint8 category, uint8 method, data_stream& parameters, data_stream& response) {
 	result_code result = result_codes::success;
-	obj_id authenticated_id = reinterpret_cast<obj_id>(client.state);
+	obj_id authenticated_id = reinterpret_cast<obj_id>(client->state);
 	obj_id start_id = authenticated_id;
 	uint16 type = (category << 8) | method;
 
