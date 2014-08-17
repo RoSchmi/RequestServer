@@ -3,12 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
 VisualStudioVersion = 12.0.30723.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Game Server", "Game Server\Game Server.vcxproj", "{8CC8633E-8BE3-4ED9-9E1D-6813516C8039}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Tests", "Tests\Tests.vcxproj", "{688E0A43-837A-4288-B993-FCAA5C3D485D}"
-	ProjectSection(ProjectDependencies) = postProject
-		{8CC8633E-8BE3-4ED9-9E1D-6813516C8039} = {8CC8633E-8BE3-4ED9-9E1D-6813516C8039}
-	EndProjectSection
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Game Server", "Game Server.vcxproj", "{8CC8633E-8BE3-4ED9-9E1D-6813516C8039}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -20,10 +15,6 @@ Global
 		{8CC8633E-8BE3-4ED9-9E1D-6813516C8039}.Debug|x64.Build.0 = Debug|x64
 		{8CC8633E-8BE3-4ED9-9E1D-6813516C8039}.Release|x64.ActiveCfg = Release|x64
 		{8CC8633E-8BE3-4ED9-9E1D-6813516C8039}.Release|x64.Build.0 = Release|x64
-		{688E0A43-837A-4288-B993-FCAA5C3D485D}.Debug|x64.ActiveCfg = Debug|x64
-		{688E0A43-837A-4288-B993-FCAA5C3D485D}.Debug|x64.Build.0 = Debug|x64
-		{688E0A43-837A-4288-B993-FCAA5C3D485D}.Release|x64.ActiveCfg = Release|x64
-		{688E0A43-837A-4288-B993-FCAA5C3D485D}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
