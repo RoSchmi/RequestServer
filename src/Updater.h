@@ -20,11 +20,11 @@ namespace game_server {
 		void tick();
 
 		public:
-			exported updater(word updates_per_tick, std::chrono::microseconds sleep_for);
-			exported ~updater();
+			updater(word updates_per_tick, std::chrono::microseconds sleep_for);
+			~updater();
 
-			exported void add(objects::updatable* object);
-			exported void remove(objects::updatable* object);
+			void add(objects::updatable* object);
+			void remove(objects::updatable* object);
 	};
 
 	class cache_updater {
@@ -36,7 +36,7 @@ namespace game_server {
 		void tick();
 
 		public:
-			exported cache_updater(cache_provider& cache, word updates_per_tick, std::chrono::microseconds sleep_for);
-			exported ~cache_updater();
+			cache_updater(cache_provider& cache, word updates_per_tick, std::chrono::microseconds sleep_for);
+			~cache_updater();
 	};
 }

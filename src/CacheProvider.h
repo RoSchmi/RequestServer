@@ -51,34 +51,34 @@ namespace game_server {
 			cache_provider& operator=(cache_provider&& other) = delete;
 			cache_provider& operator=(const cache_provider& other) = delete;
 
-			exported cache_provider(coord start_x, coord start_y, size width, size height, size los_radius);
-			exported cache_provider() = default;
-			exported virtual ~cache_provider();
+			cache_provider(coord start_x, coord start_y, size width, size height, size los_radius);
+			cache_provider() = default;
+			virtual ~cache_provider();
 
-			exported void set_bounds(coord start_x, coord start_y, size width, size height, size los_radius);
+			void set_bounds(coord start_x, coord start_y, size width, size height, size los_radius);
 
-			exported void lock();
-			exported void unlock();
-			exported void begin_update(coord x = 0, coord y = 0, size width = 0, size height = 0);
-			exported void end_update();
+			void lock();
+			void unlock();
+			void begin_update(coord x = 0, coord y = 0, size width = 0, size height = 0);
+			void end_update();
 
-			exported void clamp(coord& start_x, coord& start_y, coord& end_x, coord& end_y);
+			void clamp(coord& start_x, coord& start_y, coord& end_x, coord& end_y);
 
-			exported std::unique_ptr<objects::base_obj> get_by_id(obj_id search_id);
-			exported std::unique_ptr<objects::map_obj> get_at_location(coord x, coord y);
-			exported std::unordered_map<obj_id, std::unique_ptr<objects::map_obj>> get_in_area(coord x, coord y, size width = 1, size height = 1);
-			exported std::unordered_set<obj_id> get_users_with_los_at(coord x, coord y);
+			std::unique_ptr<objects::base_obj> get_by_id(obj_id search_id);
+			std::unique_ptr<objects::map_obj> get_at_location(coord x, coord y);
+			std::unordered_map<obj_id, std::unique_ptr<objects::map_obj>> get_in_area(coord x, coord y, size width = 1, size height = 1);
+			std::unordered_set<obj_id> get_users_with_los_at(coord x, coord y);
 
-			exported std::unordered_map<obj_id, std::unique_ptr<objects::base_obj>> get_by_owner(owner_id owner);
-			exported std::unordered_map<obj_id, std::unique_ptr<objects::map_obj>> get_in_owner_los(owner_id owner);
-			exported std::unordered_map<obj_id, std::unique_ptr<objects::map_obj>> get_in_owner_los(owner_id owner, coord x, coord y, size width, size height);
+			std::unordered_map<obj_id, std::unique_ptr<objects::base_obj>> get_by_owner(owner_id owner);
+			std::unordered_map<obj_id, std::unique_ptr<objects::map_obj>> get_in_owner_los(owner_id owner);
+			std::unordered_map<obj_id, std::unique_ptr<objects::map_obj>> get_in_owner_los(owner_id owner, coord x, coord y, size width, size height);
 
-			exported bool is_area_empty(coord x, coord y, size width = 1, size height = 1);
-			exported bool is_location_in_los(coord x, coord y, owner_id owner);
-			exported bool is_location_in_bounds(coord x, coord y, size width = 1, size height = 1);
-			exported bool is_user_present(obj_id user_id);
+			bool is_area_empty(coord x, coord y, size width = 1, size height = 1);
+			bool is_location_in_los(coord x, coord y, owner_id owner);
+			bool is_location_in_bounds(coord x, coord y, size width = 1, size height = 1);
+			bool is_user_present(obj_id user_id);
 
-			template<typename T> exported T get_by_id(obj_id search_id) {
+			template<typename T> T get_by_id(obj_id search_id) {
 				static_assert(std::is_base_of<objects::base_obj, T>::value, "typename T must derive from objects::base_obj.");
 
 				std::unique_lock<std::recursive_mutex> lck(this->mtx);
@@ -93,7 +93,7 @@ namespace game_server {
 				return T(*result);
 			}
 
-			template<typename T> exported void add(T& type) {
+			template<typename T> void add(T& type) {
 				static_assert(std::is_base_of<objects::base_obj, T>::value, "typename T must derive from objects::base_obj.");
 
 				if (this->lock_holder != std::this_thread::get_id())
@@ -113,7 +113,7 @@ namespace game_server {
 				this->add_internal(as_base);
 			}
 
-			template<typename T> exported void remove(T& type) {
+			template<typename T> void remove(T& type) {
 				static_assert(std::is_base_of<objects::base_obj, T>::value, "typename T must derive from objects::base_obj.");
 
 				if (this->lock_holder != std::this_thread::get_id())
@@ -132,7 +132,7 @@ namespace game_server {
 				this->remove_internal(as_base);
 			}
 
-			template<typename T> exported void update(T& object) {
+			template<typename T> void update(T& object) {
 				static_assert(std::is_base_of<objects::base_obj, T>::value, "typename T must derive from objects::base_obj.");
 
 				if (this->lock_holder != std::this_thread::get_id())
@@ -170,25 +170,25 @@ namespace game_server {
 					this->add_internal(orig);
 			}
 
-			template<typename T> exported void add(std::unique_ptr<T>& object) {
+			template<typename T> void add(std::unique_ptr<T>& object) {
 				static_assert(std::is_base_of<objects::base_obj, T>::value, "typename T must derive from objects::base_obj.");
 
 				this->add(*object);
 			}
 
-			template<typename T> exported void remove(std::unique_ptr<T>& object) {
+			template<typename T> void remove(std::unique_ptr<T>& object) {
 				static_assert(std::is_base_of<objects::base_obj, T>::value, "typename T must derive from objects::base_obj.");
 
 				this->remove(*object);
 			}
 
-			template<typename T> exported void update(std::unique_ptr<T>& object) {
+			template<typename T> void update(std::unique_ptr<T>& object) {
 				static_assert(std::is_base_of<objects::base_obj, T>::value, "typename T must derive from objects::base_obj.");
 
 				this->update(*object);
 			}
 
-			template<typename T> exported void add_single(std::unique_ptr<T>& object) {
+			template<typename T> void add_single(std::unique_ptr<T>& object) {
 				static_assert(std::is_base_of<objects::base_obj, T>::value, "typename T must derive from objects::base_obj.");
 
 				this->begin_update();
@@ -196,7 +196,7 @@ namespace game_server {
 				this->end_update();
 			}
 
-			template<typename T> exported void add_single(T& object) {
+			template<typename T> void add_single(T& object) {
 				static_assert(std::is_base_of<objects::base_obj, T>::value, "typename T must derive from objects::base_obj.");
 
 				this->begin_update();
@@ -204,7 +204,7 @@ namespace game_server {
 				this->end_update();
 			}
 
-			template<typename T> exported void remove_single(std::unique_ptr<T>& object) {
+			template<typename T> void remove_single(std::unique_ptr<T>& object) {
 				static_assert(std::is_base_of<objects::base_obj, T>::value, "typename T must derive from objects::base_obj.");
 
 				this->begin_update();
@@ -212,7 +212,7 @@ namespace game_server {
 				this->end_update();
 			}
 
-			template<typename T> exported void remove_single(T& object) {
+			template<typename T> void remove_single(T& object) {
 				static_assert(std::is_base_of<objects::base_obj, T>::value, "typename T must derive from objects::base_obj.");
 
 				this->begin_update();
@@ -220,7 +220,7 @@ namespace game_server {
 				this->end_update();
 			}
 
-			template<typename T> exported void update_single(std::unique_ptr<T>& object) {
+			template<typename T> void update_single(std::unique_ptr<T>& object) {
 				static_assert(std::is_base_of<objects::base_obj, T>::value, "typename T must derive from objects::base_obj.");
 
 				this->begin_update();
@@ -228,7 +228,7 @@ namespace game_server {
 				this->end_update();
 			}
 
-			template<typename T> exported void update_single(T& object) {
+			template<typename T> void update_single(T& object) {
 				static_assert(std::is_base_of<objects::base_obj, T>::value, "typename T must derive from objects::base_obj.");
 
 				this->begin_update();

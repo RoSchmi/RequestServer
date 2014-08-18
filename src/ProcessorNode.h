@@ -22,10 +22,10 @@ namespace game_server {
 		public:
 			class base_handler {
 				public:
-					exported virtual ~base_handler() = default;
-					exported virtual result_code process(obj_id& user_id) = 0;
-					exported virtual void deserialize(util::data_stream& parameters) = 0;
-					exported virtual void serialize(util::data_stream& response) = 0;
+					virtual ~base_handler() = default;
+					virtual result_code process(obj_id& user_id) = 0;
+					virtual void deserialize(util::data_stream& parameters) = 0;
+					virtual void serialize(util::data_stream& response) = 0;
 			};
 
 			class broker_node_down_exception {};
@@ -54,16 +54,16 @@ namespace game_server {
 			virtual util::net::request_server::request_result on_request(std::shared_ptr<util::net::tcp_connection> client, word worker_num, uint8 category, uint8 method, util::data_stream& parameters, util::data_stream& response);
 
 		public:
-			exported processor_node(word workers, util::net::endpoint ep, util::net::endpoint broker_ep = util::net::endpoint(), obj_id area_id = 0);
-			exported processor_node(word workers, std::vector<util::net::endpoint> eps, util::net::endpoint broker_ep = util::net::endpoint(), obj_id area_id = 0);
-			exported virtual ~processor_node();
+			processor_node(word workers, util::net::endpoint ep, util::net::endpoint broker_ep = util::net::endpoint(), obj_id area_id = 0);
+			processor_node(word workers, std::vector<util::net::endpoint> eps, util::net::endpoint broker_ep = util::net::endpoint(), obj_id area_id = 0);
+			virtual ~processor_node();
 
-			exported void start();
-			exported void send(obj_id receipient_id, util::data_stream notification);
-			exported void send_to_broker(obj_id target_id, util::data_stream message);
-			exported util::data_stream create_message(uint8 category, uint8 type);
+			void start();
+			void send(obj_id receipient_id, util::data_stream notification);
+			void send_to_broker(obj_id target_id, util::data_stream message);
+			util::data_stream create_message(uint8 category, uint8 type);
 
-			template<typename T> exported void register_handler(uint8 category, uint8 method, bool authenticated) {
+			template<typename T> void register_handler(uint8 category, uint8 method, bool authenticated) {
 				static_assert(std::is_base_of<base_handler, T>::value, "typename T must derive from base_handler.");
 
 				for (word i = 0; i < this->workers; i++)
@@ -77,8 +77,8 @@ namespace game_server {
 				virtual result_code process(obj_id& user_id) override { return result_codes::success; };
 
 				public:
-					exported virtual ~base_handler() = default;
-					exported virtual result_code process(obj_id& user_id, T& db) = 0;
+					virtual ~base_handler() = default;
+					virtual result_code process(obj_id& user_id, T& db) = 0;
 			};
 
 			typedef std::function<std::unique_ptr<T>(word)> context_creator;
@@ -92,14 +92,14 @@ namespace game_server {
 			std::vector<std::unique_ptr<T>> dbs;
 
 		public:
-			exported processor_node_db(context_creator ctx_creator, word workers, std::vector<util::net::endpoint> eps, util::net::endpoint broker_ep = util::net::endpoint(), obj_id area_id = 0) : processor_node(workers, eps, broker_ep, area_id) {
+			processor_node_db(context_creator ctx_creator, word workers, std::vector<util::net::endpoint> eps, util::net::endpoint broker_ep = util::net::endpoint(), obj_id area_id = 0) : processor_node(workers, eps, broker_ep, area_id) {
 				for (word i = 0; i < this->workers; i++)
 					this->dbs.emplace_back(std::move(ctx_creator(i)));
 			}
 
-			exported virtual ~processor_node_db() = default;
+			virtual ~processor_node_db() = default;
 
-			exported virtual util::net::request_server::request_result on_request(std::shared_ptr<util::net::tcp_connection> client, word worker_num, uint8 category, uint8 method, util::data_stream& parameters, util::data_stream& response) override {
+			virtual util::net::request_server::request_result on_request(std::shared_ptr<util::net::tcp_connection> client, word worker_num, uint8 category, uint8 method, util::data_stream& parameters, util::data_stream& response) override {
 				result_code result = result_codes::success;
 				obj_id authenticated_id = reinterpret_cast<obj_id>(client->state);
 				obj_id start_id = authenticated_id;
