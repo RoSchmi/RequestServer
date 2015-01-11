@@ -26,7 +26,7 @@ namespace ArkeIndustries.RequestServer {
 	}
 
 	public abstract class MessageHandler<ContextType> {
-		public ulong UserId { get; set; }
+		public ulong AuthenticatedId { get; set; }
 		public ContextType Context { get; set; }
 		public List<Notification> Notifications { get; set; }
 
@@ -37,7 +37,7 @@ namespace ArkeIndustries.RequestServer {
 
 		public MessageHandler() {
 			this.Notifications = new List<Notification>();
-			this.UserId = 0;
+			this.AuthenticatedId = 0;
 			this.Context = default(ContextType);
 		}
 

@@ -126,14 +126,14 @@ namespace ArkeIndustries.RequestServer {
 							var handler = this.handlers[key];
 
 							handler.Notifications.Clear();
-							handler.UserId = message.Connection.UserId;
+							handler.AuthenticatedId = message.Connection.UserId;
 
 							try {
 								handler.Deserialize<MessageInputAttribute>(requestReader);
 
 								responseHeader.ResponseCode = handler.Perform();
 
-								message.Connection.UserId = handler.UserId;
+								message.Connection.UserId = handler.AuthenticatedId;
 							}
 							catch (EndOfStreamException) {
 								responseHeader.ResponseCode = ResponseCode.WrongParameterNumber;
