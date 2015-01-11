@@ -34,6 +34,14 @@ namespace ArkeIndustries.RequestServer {
 			this.Method = reader.ReadUInt16();
 		}
 
+		public void Serialize(BinaryWriter writer) {
+			writer.Write(this.Version);
+			writer.Write(this.BodyLength);
+			writer.Write(this.Id);
+			writer.Write(this.Category);
+			writer.Write(this.Method);
+		}
+
 		public static int ExtractBodyLength(byte[] buffer) {
 			return (buffer[3] << 8) | buffer[2];
 		}
@@ -43,6 +51,12 @@ namespace ArkeIndustries.RequestServer {
 		public ushort BodyLength { get; set; }
 		public uint Id { get; set; }
 		public ushort ResponseCode { get; set; }
+
+		public void Deserialize(BinaryReader reader) {
+			this.BodyLength = reader.ReadUInt16();
+			this.Id = reader.ReadUInt32();
+			this.ResponseCode = reader.ReadUInt16();
+		}
 
 		public void Serialize(BinaryWriter writer) {
 			writer.Write(this.BodyLength);
