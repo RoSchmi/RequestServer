@@ -5,15 +5,24 @@ using System.Linq;
 using System.Reflection;
 
 namespace ArkeIndustries.RequestServer {
-	[AttributeUsage(AttributeTargets.Field)]
-	public class MessageDirectionAttribute : Attribute {
-		public int Index { get; set; }
-		public bool IsInput { get; set; }
-	}
-
 	[AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
 	public class MessageServerAttribute : Attribute {
 		public int ServerId { get; set; }
+	}
+
+	[AttributeUsage(AttributeTargets.Field)]
+	public class MessageParameterAttribute : Attribute {
+		public int Index { get; set; }
+	}
+
+	[AttributeUsage(AttributeTargets.Field)]
+	public class MessageInputAttribute : MessageParameterAttribute {
+
+	}
+
+	[AttributeUsage(AttributeTargets.Field)]
+	public class MessageOutputAttribute : MessageParameterAttribute {
+
 	}
 
 	public abstract class MessageHandler<ContextType> {
@@ -32,70 +41,70 @@ namespace ArkeIndustries.RequestServer {
 			this.Context = default(ContextType);
 		}
 
-		public void Deserialize(BinaryReader request, bool deserializeInputFields = true) {
-			var fields = this.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance).Where(p => p.IsDefined(typeof(MessageDirectionAttribute)) && p.GetCustomAttribute<MessageDirectionAttribute>().IsInput == deserializeInputFields).OrderBy(p => p.GetCustomAttribute<MessageDirectionAttribute>().Index);
+		public void Deserialize<AttributeType>(BinaryReader reader) where AttributeType : MessageParameterAttribute {
+            var fields = this.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance).Where(p => p.IsDefined(typeof(AttributeType))).OrderBy(p => p.GetCustomAttribute<AttributeType>().Index);
 
 			foreach (var i in fields) {
 				if (i.FieldType == typeof(string)) {
-					i.SetValue(this, request.ReadString());
+					i.SetValue(this, reader.ReadString());
 				}
 				else if (i.FieldType == typeof(byte)) {
-					i.SetValue(this, request.ReadByte());
+					i.SetValue(this, reader.ReadByte());
 				}
 				else if (i.FieldType == typeof(sbyte)) {
-					i.SetValue(this, request.ReadSByte());
+					i.SetValue(this, reader.ReadSByte());
 				}
 				else if (i.FieldType == typeof(ushort)) {
-					i.SetValue(this, request.ReadUInt16());
+					i.SetValue(this, reader.ReadUInt16());
 				}
 				else if (i.FieldType == typeof(short)) {
-					i.SetValue(this, request.ReadInt16());
+					i.SetValue(this, reader.ReadInt16());
 				}
 				else if (i.FieldType == typeof(uint)) {
-					i.SetValue(this, request.ReadUInt32());
+					i.SetValue(this, reader.ReadUInt32());
 				}
 				else if (i.FieldType == typeof(int)) {
-					i.SetValue(this, request.ReadInt32());
+					i.SetValue(this, reader.ReadInt32());
 				}
 				else if (i.FieldType == typeof(ulong)) {
-					i.SetValue(this, request.ReadUInt64());
+					i.SetValue(this, reader.ReadUInt64());
 				}
 				else if (i.FieldType == typeof(long)) {
-					i.SetValue(this, request.ReadInt64());
+					i.SetValue(this, reader.ReadInt64());
 				}
 			}
 		}
 
-		public void Serialize(BinaryWriter response, bool serializeOutputFields = true) {
-			var fields = this.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance).Where(p => p.IsDefined(typeof(MessageDirectionAttribute)) && p.GetCustomAttribute<MessageDirectionAttribute>().IsInput != serializeOutputFields).OrderBy(p => p.GetCustomAttribute<MessageDirectionAttribute>().Index);
+        public void Serialize<AttributeType>(BinaryWriter writer) where AttributeType : MessageParameterAttribute {
+			var fields = this.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance).Where(p => p.IsDefined(typeof(AttributeType))).OrderBy(p => p.GetCustomAttribute<AttributeType>().Index);
 
 			foreach (var i in fields) {
 				if (i.FieldType == typeof(string)) {
-					response.Write((string)i.GetValue(this));
+					writer.Write((string)i.GetValue(this));
 				}
 				else if (i.FieldType == typeof(byte)) {
-					response.Write((byte)i.GetValue(this));
+					writer.Write((byte)i.GetValue(this));
 				}
 				else if (i.FieldType == typeof(sbyte)) {
-					response.Write((sbyte)i.GetValue(this));
+					writer.Write((sbyte)i.GetValue(this));
 				}
 				else if (i.FieldType == typeof(ushort)) {
-					response.Write((ushort)i.GetValue(this));
+					writer.Write((ushort)i.GetValue(this));
 				}
 				else if (i.FieldType == typeof(short)) {
-					response.Write((short)i.GetValue(this));
+					writer.Write((short)i.GetValue(this));
 				}
 				else if (i.FieldType == typeof(uint)) {
-					response.Write((uint)i.GetValue(this));
+					writer.Write((uint)i.GetValue(this));
 				}
 				else if (i.FieldType == typeof(int)) {
-					response.Write((int)i.GetValue(this));
+					writer.Write((int)i.GetValue(this));
 				}
 				else if (i.FieldType == typeof(ulong)) {
-					response.Write((ulong)i.GetValue(this));
+					writer.Write((ulong)i.GetValue(this));
 				}
 				else if (i.FieldType == typeof(long)) {
-					response.Write((long)i.GetValue(this));
+					writer.Write((long)i.GetValue(this));
 				}
 			}
 		}

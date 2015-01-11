@@ -127,7 +127,7 @@ namespace ArkeIndustries.RequestServer {
 						handler.UserId = message.Connection.UserId;
 
 						try {
-							handler.Deserialize(requestReader);
+							handler.Deserialize<MessageInputAttribute>(requestReader);
 
 							responseHeader.ResponseCode = handler.Perform();
 
@@ -138,7 +138,7 @@ namespace ArkeIndustries.RequestServer {
 						}
 
 						if (responseHeader.ResponseCode == ResponseCode.Success)
-							handler.Serialize(responseWriter);
+							handler.Serialize<MessageOutputAttribute>(responseWriter);
 					}
 					else {
 						responseHeader.ResponseCode = ResponseCode.InvalidMethod;
