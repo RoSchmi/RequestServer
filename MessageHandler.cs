@@ -6,13 +6,9 @@ using System.Reflection;
 
 namespace ArkeIndustries.RequestServer {
 	[AttributeUsage(AttributeTargets.Field)]
-	public class MessageInputAttribute : Attribute {
+	public class MessageDirectionAttribute : Attribute {
 		public int Index { get; set; }
-	}
-
-	[AttributeUsage(AttributeTargets.Field)]
-	public class MessageOutputAttribute : Attribute {
-		public int Index { get; set; }
+		public bool IsInput { get; set; }
 	}
 
 	[AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
@@ -36,10 +32,10 @@ namespace ArkeIndustries.RequestServer {
 			this.Context = default(ContextType);
 		}
 
-		public void DeserializeInput(BinaryReader request) {
-			var inputs = this.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance).Where(p => p.IsDefined(typeof(MessageInputAttribute))).OrderBy(p => p.GetCustomAttribute<MessageInputAttribute>().Index);
+		public void Deserialize(BinaryReader request, bool deserializeInputFields = true) {
+			var fields = this.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance).Where(p => p.IsDefined(typeof(MessageDirectionAttribute)) && p.GetCustomAttribute<MessageDirectionAttribute>().IsInput == deserializeInputFields).OrderBy(p => p.GetCustomAttribute<MessageDirectionAttribute>().Index);
 
-			foreach (var i in inputs) {
+			foreach (var i in fields) {
 				if (i.FieldType == typeof(string)) {
 					i.SetValue(this, request.ReadString());
 				}
@@ -70,10 +66,10 @@ namespace ArkeIndustries.RequestServer {
 			}
 		}
 
-		public void SerializeOutput(BinaryWriter response) {
-			var outputs = this.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance).Where(p => p.IsDefined(typeof(MessageOutputAttribute))).OrderBy(p => p.GetCustomAttribute<MessageOutputAttribute>().Index);
+		public void Serialize(BinaryWriter response, bool serializeOutputFields = true) {
+			var fields = this.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance).Where(p => p.IsDefined(typeof(MessageDirectionAttribute)) && p.GetCustomAttribute<MessageDirectionAttribute>().IsInput != serializeOutputFields).OrderBy(p => p.GetCustomAttribute<MessageDirectionAttribute>().Index);
 
-			foreach (var i in outputs) {
+			foreach (var i in fields) {
 				if (i.FieldType == typeof(string)) {
 					response.Write((string)i.GetValue(this));
 				}
