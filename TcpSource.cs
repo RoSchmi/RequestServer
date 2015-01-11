@@ -23,15 +23,15 @@ namespace ArkeIndustries.RequestServer.Sources {
 		}
 
 		public override void Start() {
-			base.Start();
-
 			this.listener.Start();
+
+			base.Start();
 		}
 
 		public override void Stop() {
-			this.listener.Stop();
-
 			base.Stop();
+
+			this.listener.Stop();
 		}
 	}
 
