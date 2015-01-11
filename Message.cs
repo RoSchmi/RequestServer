@@ -3,72 +3,88 @@ using System.IO;
 
 namespace ArkeIndustries.RequestServer {
 	public class Message {
-		public static int HeaderLength { get; } = 24;
-		public static int MaxBodyLength { get; } = 0xFFF;
-
 		public byte[] Data { get; }
 		public Connection Connection { get; }
 		public int SendAttempts { get; set; }
 
-		public Message(Connection connection, byte[] data, int bodyLength) {
+		public Message(Connection connection, byte[] data, int length) {
 			this.SendAttempts = 0;
 			this.Connection = connection;
-			this.Data = new byte[bodyLength];
+			this.Data = new byte[length];
 
-			Array.Copy(data, this.Data, bodyLength);
+			Array.Copy(data, this.Data, length);
 		}
 	}
 
-	public class RequestHeader {
-		public ushort Version { get; set; }
+	public class MessageHeader {
+		public static int Length { get; } = 24;
+		public static int MaxBodyLength { get; } = 0xFFF;
+
 		public ushort BodyLength { get; set; }
 		public uint Id { get; set; }
+		public ushort Version { get; set; }
+
+		public virtual void Deserialize(BinaryReader reader) {
+			this.BodyLength = reader.ReadUInt16();
+			this.Id = reader.ReadUInt32();
+			this.Version = reader.ReadUInt16();
+		}
+
+		public virtual void Serialize(BinaryWriter writer) {
+			writer.Write(this.BodyLength);
+			writer.Write(this.Id);
+			writer.Write(this.Version);
+		}
+
+		public static int ExtractBodyLength(byte[] buffer) {
+			return (buffer[1] << 8) | buffer[0];
+		}
+	}
+
+	public class RequestHeader : MessageHeader {
 		public ushort Category { get; set; }
 		public ushort Method { get; set; }
 
-		public void Deserialize(BinaryReader reader) {
-			this.Version = reader.ReadUInt16();
-			this.BodyLength = reader.ReadUInt16();
-			this.Id = reader.ReadUInt32();
+		public override void Deserialize(BinaryReader reader) {
+			base.Deserialize(reader);
+
 			this.Category = reader.ReadUInt16();
 			this.Method = reader.ReadUInt16();
 		}
 
-		public void Serialize(BinaryWriter writer) {
-			writer.Write(this.Version);
-			writer.Write(this.BodyLength);
-			writer.Write(this.Id);
+		public override void Serialize(BinaryWriter writer) {
+			base.Serialize(writer);
+
 			writer.Write(this.Category);
 			writer.Write(this.Method);
 		}
-
-		public static int ExtractBodyLength(byte[] buffer) {
-			return (buffer[3] << 8) | buffer[2];
-		}
 	}
 
-	public class ResponseHeader {
-		public ushort BodyLength { get; set; }
-		public uint Id { get; set; }
+	public class ResponseHeader : MessageHeader {
 		public ushort ResponseCode { get; set; }
 
-		public void Deserialize(BinaryReader reader) {
-			this.BodyLength = reader.ReadUInt16();
-			this.Id = reader.ReadUInt32();
+		public override void Deserialize(BinaryReader reader) {
+			base.Deserialize(reader);
+
 			this.ResponseCode = reader.ReadUInt16();
 		}
 
-		public void Serialize(BinaryWriter writer) {
-			writer.Write(this.BodyLength);
-			writer.Write(this.Id);
+		public override void Serialize(BinaryWriter writer) {
+			base.Serialize(writer);
+
 			writer.Write(this.ResponseCode);
 		}
 	}
 
-	public class Notification {
+	public class Notification : MessageHeader {
 		public ulong TargetUserId { get; set; }
+
 		public ushort NotificationType { get; set; }
 		public ulong ObjectId { get; set; }
+
+		public Notification() : this(0, 0, 0) {
+
+		}
 
 		public Notification(ulong targetUserId, ushort notificationType, ulong objectId) {
 			this.TargetUserId = targetUserId;
@@ -76,10 +92,16 @@ namespace ArkeIndustries.RequestServer {
 			this.ObjectId = objectId;
 		}
 
-		public void Serialize(BinaryWriter writer) {
-			writer.Write((ushort)0);
-			writer.Write((uint)0);
-			writer.Write((ushort)0);
+		public override void Deserialize(BinaryReader reader) {
+			base.Deserialize(reader);
+
+			this.NotificationType = reader.ReadUInt16();
+			this.ObjectId = reader.ReadUInt64();
+		}
+
+		public override void Serialize(BinaryWriter writer) {
+			base.Serialize(writer);
+
 			writer.Write(this.NotificationType);
 			writer.Write(this.ObjectId);
 		}

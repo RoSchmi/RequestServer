@@ -17,7 +17,7 @@ namespace ArkeIndustries.RequestServer {
 
 		public Connection(CancellationToken token) {
 			this.cancellationToken = token;
-			this.buffer = new byte[Message.MaxBodyLength + Message.HeaderLength];
+			this.buffer = new byte[MessageHeader.MaxBodyLength + MessageHeader.Length];
 			this.readSoFar = 0;
 			this.expectedLength = 0;
 			this.hasHeader = false;
@@ -46,18 +46,18 @@ namespace ArkeIndustries.RequestServer {
 					break;
 
 				this.readSoFar += read;
-				this.hasHeader = this.readSoFar >= Message.HeaderLength;
+				this.hasHeader = this.readSoFar >= MessageHeader.Length;
 
 				if (!this.hasHeader)
 					continue;
 
 				if (this.expectedLength == 0)
-					this.expectedLength = RequestHeader.ExtractBodyLength(this.buffer) + Message.HeaderLength;
+					this.expectedLength = MessageHeader.ExtractBodyLength(this.buffer) + MessageHeader.Length;
 
 				if (this.readSoFar < this.expectedLength)
 					continue;
 
-				if (this.expectedLength > Message.MaxBodyLength + Message.HeaderLength)
+				if (this.expectedLength > MessageHeader.MaxBodyLength + MessageHeader.Length)
 					break;
 
 				var message = new Message(this, this.buffer, this.expectedLength);

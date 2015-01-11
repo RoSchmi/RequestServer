@@ -50,20 +50,22 @@ namespace ArkeIndustries.RequestServer {
 
 		public void AssociateServerRequests(int serverId) {
 			var type = typeof(MessageHandler<ContextType>);
-			var assembly = Assembly.GetAssembly(type);
-			var childClasses = assembly.GetTypes().Where(t => t.GetType() != type && type.IsAssignableFrom(t));
-			var matchingClasses = childClasses.Where(c => c.IsDefined(typeof(MessageServerAttribute)) && c.GetCustomAttribute<MessageServerAttribute>().ServerId == serverId);
 
-			foreach (var c in matchingClasses) {
-				var handler = (MessageHandler<ContextType>)c.GetConstructor(Type.EmptyTypes).Invoke(null);
-				var key = handler.GetKey();
+			foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies()) {
+				var childClasses = assembly.GetTypes().Where(t => t.GetType() != type && type.IsAssignableFrom(t));
+				var matchingClasses = childClasses.Where(c => c.IsDefined(typeof(MessageServerAttribute)) && c.GetCustomAttribute<MessageServerAttribute>().ServerId == serverId);
 
-				if (this.handlers.ContainsKey(key))
-					throw new InvalidOperationException("This method is already defined.");
+				foreach (var c in matchingClasses) {
+					var handler = (MessageHandler<ContextType>)c.GetConstructor(Type.EmptyTypes).Invoke(null);
+					var key = handler.GetKey();
 
-				handler.Context = this.Context;
+					if (this.handlers.ContainsKey(key))
+						throw new InvalidOperationException("This method is already defined.");
 
-				this.handlers.Add(key, handler);
+					handler.Context = this.Context;
+
+					this.handlers.Add(key, handler);
+				}
 			}
 		}
 
@@ -96,7 +98,7 @@ namespace ArkeIndustries.RequestServer {
 			Message message;
 			var requestHeader = new RequestHeader();
 			var responseHeader = new ResponseHeader();
-			var responseBuffer = new byte[Message.HeaderLength + Message.MaxBodyLength];
+			var responseBuffer = new byte[MessageHeader.Length + MessageHeader.MaxBodyLength];
 			var responseWriter = new BinaryWriter(new MemoryStream(responseBuffer));
 
 			while (!this.cancellationSource.IsCancellationRequested) {
@@ -109,15 +111,15 @@ namespace ArkeIndustries.RequestServer {
 
 				this.ReceivedMessages++;
 
-				responseWriter.Seek(Message.HeaderLength, SeekOrigin.Begin);
+				responseWriter.Seek(MessageHeader.Length, SeekOrigin.Begin);
 
 				using (var requestReader = new BinaryReader(new MemoryStream(message.Data))) {
 
 					requestHeader.Deserialize(requestReader);
 
-					requestReader.BaseStream.Seek(Message.HeaderLength, SeekOrigin.Begin);
+					requestReader.BaseStream.Seek(MessageHeader.Length, SeekOrigin.Begin);
 
-					if (requestHeader.BodyLength + Message.HeaderLength == message.Data.Length) {
+					if (requestHeader.BodyLength + MessageHeader.Length == message.Data.Length) {
 						var key = MessageHandler<ContextType>.GetKey(requestHeader.Category, requestHeader.Method);
 
 						if (this.handlers.ContainsKey(key)) {
@@ -149,13 +151,13 @@ namespace ArkeIndustries.RequestServer {
 					}
 
 					responseHeader.Id = requestHeader.Id;
-					responseHeader.BodyLength = (ushort)(responseWriter.BaseStream.Position - Message.HeaderLength);
+					responseHeader.BodyLength = (ushort)(responseWriter.BaseStream.Position - MessageHeader.Length);
 
 					responseWriter.Seek(0, SeekOrigin.Begin);
 
 					responseHeader.Serialize(responseWriter);
 
-					this.outgoingMessages.Add(new Message(message.Connection, responseBuffer, responseHeader.BodyLength + Message.HeaderLength));
+					this.outgoingMessages.Add(new Message(message.Connection, responseBuffer, responseHeader.BodyLength + MessageHeader.Length));
 					this.SentMessages++;
 				}
 			}
@@ -179,7 +181,7 @@ namespace ArkeIndustries.RequestServer {
 
 		private void ProcessNotifications() {
 			Notification notification;
-			Message message = new Message(null, new byte[Message.HeaderLength], 0);
+			Message message = new Message(null, new byte[MessageHeader.Length], 0);
 			var writer = new BinaryWriter(new MemoryStream(message.Data));
 
 			while (!this.cancellationSource.IsCancellationRequested) {
