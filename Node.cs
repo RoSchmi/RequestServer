@@ -54,7 +54,7 @@ namespace ArkeIndustries.RequestServer {
 			var childClasses = assembly.GetTypes().Where(t => t.GetType() != type && type.IsAssignableFrom(t));
 			var matchingClasses = childClasses.Where(c => c.IsDefined(typeof(MessageServerAttribute)) && c.GetCustomAttribute<MessageServerAttribute>().ServerId == serverId);
 
-			foreach  (var c in matchingClasses) {
+			foreach (var c in matchingClasses) {
 				var handler = (MessageHandler<ContextType>)c.GetConstructor(Type.EmptyTypes).Invoke(null);
 				var key = handler.GetKey();
 
@@ -111,52 +111,53 @@ namespace ArkeIndustries.RequestServer {
 
 				responseWriter.Seek(Message.HeaderLength, SeekOrigin.Begin);
 
-				var requestReader = new BinaryReader(new MemoryStream(message.Data));
+				using (var requestReader = new BinaryReader(new MemoryStream(message.Data))) {
 
-				requestHeader.Deserialize(requestReader);
+					requestHeader.Deserialize(requestReader);
 
-				requestReader.BaseStream.Seek(Message.HeaderLength, SeekOrigin.Begin);
+					requestReader.BaseStream.Seek(Message.HeaderLength, SeekOrigin.Begin);
 
-				if (requestHeader.BodyLength + Message.HeaderLength == message.Data.Length) {
-					var key = MessageHandler<ContextType>.GetKey(requestHeader.Category, requestHeader.Method);
+					if (requestHeader.BodyLength + Message.HeaderLength == message.Data.Length) {
+						var key = MessageHandler<ContextType>.GetKey(requestHeader.Category, requestHeader.Method);
 
-					if (this.handlers.ContainsKey(key)) {
-						var handler = this.handlers[key];
+						if (this.handlers.ContainsKey(key)) {
+							var handler = this.handlers[key];
 
-						handler.Notifications.Clear();
-						handler.UserId = message.Connection.UserId;
+							handler.Notifications.Clear();
+							handler.UserId = message.Connection.UserId;
 
-						try {
-							handler.Deserialize<MessageInputAttribute>(requestReader);
+							try {
+								handler.Deserialize<MessageInputAttribute>(requestReader);
 
-							responseHeader.ResponseCode = handler.Perform();
+								responseHeader.ResponseCode = handler.Perform();
 
-							message.Connection.UserId = handler.UserId;
+								message.Connection.UserId = handler.UserId;
+							}
+							catch (EndOfStreamException) {
+								responseHeader.ResponseCode = ResponseCode.InvalidParameters;
+							}
+
+							if (responseHeader.ResponseCode == ResponseCode.Success)
+								handler.Serialize<MessageOutputAttribute>(responseWriter);
 						}
-						catch (EndOfStreamException) {
-							responseHeader.ResponseCode = ResponseCode.InvalidParameters;
+						else {
+							responseHeader.ResponseCode = ResponseCode.InvalidMethod;
 						}
-
-						if (responseHeader.ResponseCode == ResponseCode.Success)
-							handler.Serialize<MessageOutputAttribute>(responseWriter);
 					}
 					else {
-						responseHeader.ResponseCode = ResponseCode.InvalidMethod;
+						responseHeader.ResponseCode = ResponseCode.InvalidParameters;
 					}
+
+					responseHeader.Id = requestHeader.Id;
+					responseHeader.BodyLength = (ushort)(responseWriter.BaseStream.Position - Message.HeaderLength);
+
+					responseWriter.Seek(0, SeekOrigin.Begin);
+
+					responseHeader.Serialize(responseWriter);
+
+					this.outgoingMessages.Add(new Message(message.Connection, responseBuffer, responseHeader.BodyLength + Message.HeaderLength));
+					this.SentMessages++;
 				}
-				else {
-					responseHeader.ResponseCode = ResponseCode.InvalidParameters;
-				}
-
-				responseHeader.Id = requestHeader.Id;
-				responseHeader.BodyLength = (ushort)(responseWriter.BaseStream.Position - Message.HeaderLength);
-
-				responseWriter.Seek(0, SeekOrigin.Begin);
-
-				responseHeader.Serialize(responseWriter);
-
-				this.outgoingMessages.Add(new Message(message.Connection, responseBuffer, responseHeader.BodyLength + Message.HeaderLength));
-				this.SentMessages++;
 			}
 		}
 
