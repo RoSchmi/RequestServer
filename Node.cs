@@ -126,14 +126,14 @@ namespace ArkeIndustries.RequestServer {
 							var handler = this.handlers[key];
 
 							handler.Notifications.Clear();
-							handler.AuthenticatedId = message.Connection.UserId;
+							handler.AuthenticatedId = message.Connection.AuthenticatedId;
 
 							try {
 								handler.Deserialize<MessageInputAttribute>(requestReader);
 
 								responseHeader.ResponseCode = handler.Perform();
 
-								message.Connection.UserId = handler.AuthenticatedId;
+								message.Connection.AuthenticatedId = handler.AuthenticatedId;
 							}
 							catch (EndOfStreamException) {
 								responseHeader.ResponseCode = ResponseCode.WrongParameterNumber;
@@ -196,17 +196,17 @@ namespace ArkeIndustries.RequestServer {
 
 				notification.Serialize(writer);
 
-				foreach (var c in this.FindConnectionsForUserId(notification.TargetUserId))
+				foreach (var c in this.FindConnectionsForAuthenticatedId(notification.TargetAuthenticatedId))
 					c.Send(message);
 			}
 		}
 
-		private List<Connection> FindConnectionsForUserId(ulong userId) {
+		private List<Connection> FindConnectionsForAuthenticatedId(long authenticatedId) {
 			var list = new List<Connection>();
 
 			foreach (var s in this.sources)
 				lock (s.Connections)
-					list.AddRange(s.Connections.Where(c => c.UserId == userId));
+					list.AddRange(s.Connections.Where(c => c.AuthenticatedId == authenticatedId));
 
 			return list;
 		}

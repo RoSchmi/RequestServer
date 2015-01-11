@@ -77,17 +77,17 @@ namespace ArkeIndustries.RequestServer {
 	}
 
 	public class Notification : MessageHeader {
-		public ulong TargetUserId { get; set; }
+		public long TargetAuthenticatedId { get; set; }
 
 		public ushort NotificationType { get; set; }
-		public ulong ObjectId { get; set; }
+		public long ObjectId { get; set; }
 
 		public Notification() : this(0, 0, 0) {
 
 		}
 
-		public Notification(ulong targetUserId, ushort notificationType, ulong objectId) {
-			this.TargetUserId = targetUserId;
+		public Notification(long targetAuthenticatedId, ushort notificationType, long objectId) {
+			this.TargetAuthenticatedId = targetAuthenticatedId;
 			this.NotificationType = notificationType;
 			this.ObjectId = objectId;
 		}
@@ -96,7 +96,7 @@ namespace ArkeIndustries.RequestServer {
 			base.Deserialize(reader);
 
 			this.NotificationType = reader.ReadUInt16();
-			this.ObjectId = reader.ReadUInt64();
+			this.ObjectId = reader.ReadInt64();
 		}
 
 		public override void Serialize(BinaryWriter writer) {

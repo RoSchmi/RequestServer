@@ -13,7 +13,7 @@ namespace ArkeIndustries.RequestServer {
 		protected bool disposed;
 		protected CancellationToken cancellationToken;
 
-		public ulong UserId { get; set; }
+		public long AuthenticatedId { get; set; }
 
 		public Connection(CancellationToken token) {
 			this.cancellationToken = token;

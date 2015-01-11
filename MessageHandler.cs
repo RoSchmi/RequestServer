@@ -117,8 +117,8 @@ namespace ArkeIndustries.RequestServer {
 			return MessageHandler<ContextType>.GetKey(this.Category, this.Method);
 		}
 
-		protected void SendNotification(ulong targetUserId, ushort notificationType, ulong objectId = 0) {
-			this.Notifications.Add(new Notification(targetUserId, notificationType, objectId));
+		protected void SendNotification(long targetAuthenticatedId, ushort notificationType, long objectId = 0) {
+			this.Notifications.Add(new Notification(targetAuthenticatedId, notificationType, objectId));
 		}
 	}
 }
