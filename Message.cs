@@ -110,8 +110,10 @@ namespace ArkeIndustries.RequestServer {
 	public class ResponseCode {
 		public static ushort Success { get; } = 0;
 		public static ushort NotAuthorized { get; } = 1;
-		public static ushort InvalidMethod { get; } = 2;
-		public static ushort InvalidParameters { get; } = 3;
+		public static ushort WrongMethod { get; } = 2;
+		public static ushort WrongParameterNumber { get; } = 3;
 		public static ushort InternalServerError { get; } = 4;
+		public static ushort ParameterFailedValidation { get; } = 5;
+		public static ushort AuthenticationFailed { get; } = 6;
 	}
 }

@@ -136,18 +136,18 @@ namespace ArkeIndustries.RequestServer {
 								message.Connection.UserId = handler.UserId;
 							}
 							catch (EndOfStreamException) {
-								responseHeader.ResponseCode = ResponseCode.InvalidParameters;
+								responseHeader.ResponseCode = ResponseCode.WrongParameterNumber;
 							}
 
 							if (responseHeader.ResponseCode == ResponseCode.Success)
 								handler.Serialize<MessageOutputAttribute>(responseWriter);
 						}
 						else {
-							responseHeader.ResponseCode = ResponseCode.InvalidMethod;
+							responseHeader.ResponseCode = ResponseCode.WrongMethod;
 						}
 					}
 					else {
-						responseHeader.ResponseCode = ResponseCode.InvalidParameters;
+						responseHeader.ResponseCode = ResponseCode.WrongParameterNumber;
 					}
 
 					responseHeader.Id = requestHeader.Id;
