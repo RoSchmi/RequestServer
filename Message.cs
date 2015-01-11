@@ -20,11 +20,11 @@ namespace ArkeIndustries.RequestServer {
 	}
 
 	public class RequestHeader {
-		public ushort Version { get; private set; }
-		public ushort BodyLength { get; private set; }
-		public uint Id { get; private set; }
-		public ushort Category { get; private set; }
-		public ushort Method { get; private set; }
+		public ushort Version { get; set; }
+		public ushort BodyLength { get; set; }
+		public uint Id { get; set; }
+		public ushort Category { get; set; }
+		public ushort Method { get; set; }
 
 		public void Deserialize(BinaryReader reader) {
 			this.Version = reader.ReadUInt16();
