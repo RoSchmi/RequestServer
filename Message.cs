@@ -6,9 +6,11 @@ namespace ArkeIndustries.RequestServer {
 		public byte[] Data { get; }
 		public Connection Connection { get; }
 		public int SendAttempts { get; set; }
+		public int ProcessAttempts { get; set; }
 
 		public Message(Connection connection, byte[] data, int length) {
 			this.SendAttempts = 0;
+			this.ProcessAttempts = 0;
 			this.Connection = connection;
 			this.Data = new byte[length];
 
@@ -115,5 +117,6 @@ namespace ArkeIndustries.RequestServer {
 		public static ushort InternalServerError { get; } = 4;
 		public static ushort ParameterFailedValidation { get; } = 5;
 		public static ushort AuthenticationFailed { get; } = 6;
-	}
+		public static ushort TryAgainLater { get; } = 7;
+    }
 }

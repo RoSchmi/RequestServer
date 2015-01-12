@@ -8,7 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 
 namespace ArkeIndustries.RequestServer {
-	public class Node<ContextType> {
+	public class Node<ContextType> where ContextType : MessageContext {
 		private BlockingCollection<Message> outgoingMessages;
 		private BlockingCollection<Message> incomingMessages;
 		private BlockingCollection<Notification> notifications;
@@ -133,10 +133,20 @@ namespace ArkeIndustries.RequestServer {
 
 								responseHeader.ResponseCode = handler.Perform();
 
+								handler.Context.SaveChanges();
+
 								message.Connection.AuthenticatedId = handler.AuthenticatedId;
 							}
 							catch (EndOfStreamException) {
 								responseHeader.ResponseCode = ResponseCode.WrongParameterNumber;
+							}
+							catch (MessageContextSaveFailedException e) {
+								if (e.CanImmediatelyRetry && message.ProcessAttempts++ < 5) {
+									this.incomingMessages.Add(message);
+								}
+								else {
+									responseHeader.ResponseCode = ResponseCode.TryAgainLater;
+								}
 							}
 
 							if (responseHeader.ResponseCode == ResponseCode.Success)
