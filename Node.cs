@@ -131,9 +131,13 @@ namespace ArkeIndustries.RequestServer {
 							try {
 								handler.Deserialize<MessageInputAttribute>(requestReader);
 
+								handler.Context.BeginMessage();
+
 								responseHeader.ResponseCode = handler.Perform();
 
 								handler.Context.SaveChanges();
+
+								handler.Context.EndMessage();
 
 								message.Connection.AuthenticatedId = handler.AuthenticatedId;
 							}

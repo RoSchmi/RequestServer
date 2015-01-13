@@ -64,6 +64,8 @@ namespace ArkeIndustries.RequestServer {
 
 				Array.Copy(this.buffer, this.expectedLength, this.buffer, 0, this.readSoFar - this.expectedLength);
 
+				this.readSoFar -= this.expectedLength;
+
 				return message;
 			}
 
