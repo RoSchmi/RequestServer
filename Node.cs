@@ -145,12 +145,18 @@ namespace ArkeIndustries.RequestServer {
 								responseHeader.ResponseCode = ResponseCode.WrongParameterNumber;
 							}
 							catch (MessageContextSaveFailedException e) {
-								if (e.CanImmediatelyRetry && message.ProcessAttempts++ < 5) {
-									this.incomingMessages.Add(message);
+								if (e.CanRetry) {
+									if (++message.ProcessAttempts <= this.MessageRetryAttempts) {
+										this.incomingMessages.Add(message);
+									}
+									else {
+										responseHeader.ResponseCode = ResponseCode.TryAgainLater;
+									}
 								}
 								else {
-									responseHeader.ResponseCode = ResponseCode.TryAgainLater;
+									responseHeader.ResponseCode = e.ResponseCode;
 								}
+
 							}
 
 							if (responseHeader.ResponseCode == ResponseCode.Success)

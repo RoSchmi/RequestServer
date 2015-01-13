@@ -118,5 +118,6 @@ namespace ArkeIndustries.RequestServer {
 		public static ushort ParameterFailedValidation { get; } = 5;
 		public static ushort AuthenticationFailed { get; } = 6;
 		public static ushort TryAgainLater { get; } = 7;
-    }
+		public static ushort ConcurrencyFailure { get; } = 8;
+	}
 }
