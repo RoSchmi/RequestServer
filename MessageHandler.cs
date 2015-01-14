@@ -111,7 +111,7 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		public virtual bool IsValid() {
-			return this.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance).Where(p => p.IsDefined(typeof(ValidationAttribute))).Any(f => f.GetCustomAttributes<ValidationAttribute>().Any(a => !a.IsValid(f.GetValue(this))));
+			return !this.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance).Where(p => p.IsDefined(typeof(ValidationAttribute))).Any(f => f.GetCustomAttributes<ValidationAttribute>().Any(a => !a.IsValid(f.GetValue(this))));
 		}
 
 		public static uint GetKey(ushort category, ushort method) {
