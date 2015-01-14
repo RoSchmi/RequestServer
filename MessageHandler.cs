@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -107,6 +108,10 @@ namespace ArkeIndustries.RequestServer {
 					writer.Write((long)i.GetValue(this));
 				}
 			}
+		}
+
+		public virtual bool IsValid() {
+			return this.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance).Where(p => p.IsDefined(typeof(ValidationAttribute))).Any(f => f.GetCustomAttributes<ValidationAttribute>().Any(a => !a.IsValid(f.GetValue(this))));
 		}
 
 		public static uint GetKey(ushort category, ushort method) {

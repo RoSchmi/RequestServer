@@ -133,13 +133,17 @@ namespace ArkeIndustries.RequestServer {
 
 								handler.Context.BeginMessage();
 
-								responseHeader.ResponseCode = handler.Perform();
+								if (handler.IsValid()) {
+									responseHeader.ResponseCode = handler.Perform();
 
-								handler.Context.SaveChanges();
+									handler.Context.SaveChanges();
 
-								handler.Context.EndMessage();
+									message.Connection.AuthenticatedId = handler.AuthenticatedId;
+								}
+								else {
+									responseHeader.ResponseCode = ResponseCode.ParameterValidationFailed;
+								}
 
-								message.Connection.AuthenticatedId = handler.AuthenticatedId;
 							}
 							catch (EndOfStreamException) {
 								responseHeader.ResponseCode = ResponseCode.WrongParameterNumber;
@@ -156,8 +160,9 @@ namespace ArkeIndustries.RequestServer {
 								else {
 									responseHeader.ResponseCode = e.ResponseCode;
 								}
-
 							}
+
+							handler.Context.EndMessage();
 
 							if (responseHeader.ResponseCode == ResponseCode.Success)
 								handler.Serialize<MessageOutputAttribute>(responseWriter);

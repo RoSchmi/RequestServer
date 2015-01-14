@@ -115,7 +115,7 @@ namespace ArkeIndustries.RequestServer {
 		public static ushort WrongMethod { get; } = 2;
 		public static ushort WrongParameterNumber { get; } = 3;
 		public static ushort InternalServerError { get; } = 4;
-		public static ushort ParameterFailedValidation { get; } = 5;
+		public static ushort ParameterValidationFailed { get; } = 5;
 		public static ushort AuthenticationFailed { get; } = 6;
 		public static ushort TryAgainLater { get; } = 7;
 		public static ushort ConcurrencyFailure { get; } = 8;
