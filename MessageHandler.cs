@@ -2,11 +2,22 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
+using System.Runtime.Serialization;
 
 namespace ArkeIndustries.RequestServer {
+	[Serializable]
+	public class ListQueryValidationFailedException : Exception {
+		public ListQueryValidationFailedException() { }
+		public ListQueryValidationFailedException(string message) : base(message) { }
+		public ListQueryValidationFailedException(string message, Exception inner) : base(message, inner) { }
+		protected ListQueryValidationFailedException(SerializationInfo info, StreamingContext context) : base(info, context) { }
+	}
+
 	[AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
 	public class MessageServerAttribute : Attribute {
 		public int ServerId { get; set; }
@@ -28,6 +39,8 @@ namespace ArkeIndustries.RequestServer {
 	}
 
 	public abstract class MessageHandler<ContextType> {
+		public static DateTime DateTimeEpoch = new DateTime(2015, 1, 1, 0, 0, 0);
+
 		public long AuthenticatedId { get; set; }
 		public ContextType Context { get; set; }
 		public List<Notification> Notifications { get; set; }
@@ -82,6 +95,9 @@ namespace ArkeIndustries.RequestServer {
 			}
 			else if (field.FieldType == typeof(long)) {
 				field.SetValue(o, reader.ReadInt64());
+			}
+			else if (field.FieldType == typeof(DateTime)) {
+				field.SetValue(o, MessageHandler<ContextType>.DateTimeEpoch.AddMilliseconds(reader.ReadUInt64() * TimeSpan.TicksPerMillisecond));
 			}
 			else {
 				if (field.FieldType.GetInterfaces().Any(i => i == typeof(IList))) {
@@ -142,6 +158,9 @@ namespace ArkeIndustries.RequestServer {
 			else if (field.FieldType == typeof(long)) {
 				writer.Write((long)child);
 			}
+			else if (field.FieldType == typeof(DateTime)) {
+				writer.Write((ulong)((DateTime)child - MessageHandler<ContextType>.DateTimeEpoch).TotalMilliseconds);
+			}
 			else {
 				if (field.FieldType.GetInterfaces().Any(i => i == typeof(IList))) {
 					var collection = (IList)child;
@@ -178,6 +197,37 @@ namespace ArkeIndustries.RequestServer {
 
 		protected void SendNotification(long targetAuthenticatedId, ushort notificationType, long objectId = 0) {
 			this.Notifications.Add(new Notification(targetAuthenticatedId, notificationType, objectId));
+		}
+	}
+
+	public abstract class ListQueryMessageHandler<ContextType, QueryType> : MessageHandler<ContextType> {
+		[MessageInput(Index = 0)]
+		[DataAnnotations.AtLeast(0)]
+		protected uint skip;
+
+		[MessageInput(Index = 1)]
+		[DataAnnotations.AtLeast(0)]
+		protected uint take;
+
+		[MessageInput(Index = 2)]
+		[DataAnnotations.ApiString]
+		protected string orderByField;
+
+		[MessageInput(Index = 3)]
+		protected bool orderByAscending;
+
+		[MessageOutput(Index = 0)]
+		protected List<QueryType> entries;
+
+		protected void OrderTakeAndSet(IQueryable<QueryType> query) {
+			var prop = typeof(QueryType).GetProperty(this.orderByField);
+
+			if (prop == null)
+				throw new ListQueryValidationFailedException();
+
+			query = this.orderByAscending ? query.OrderBy(e => prop.GetValue(e)) : query.OrderByDescending(e => prop.GetValue(e));
+				
+			this.entries = query.Skip((int)this.skip).Take((int)this.take).ToList();
 		}
 	}
 }
