@@ -12,7 +12,8 @@ namespace ArkeIndustries.RequestServer {
 		private BlockingCollection<Message> outgoingMessages;
 		private BlockingCollection<Message> incomingMessages;
 		private BlockingCollection<Notification> notifications;
-		private Dictionary<uint, MessageHandler<ContextType>> handlers;
+		private Dictionary<uint, MessageHandler<ContextType>> authenticatedHandlers;
+		private Dictionary<uint, MessageHandler<ContextType>> unauthenticatedHandlers;
 		private List<MessageSource> sources;
 		private CancellationTokenSource cancellationSource;
 		private Task incomingWorker;
@@ -33,7 +34,8 @@ namespace ArkeIndustries.RequestServer {
 			this.outgoingMessages = new BlockingCollection<Message>();
 			this.incomingMessages = new BlockingCollection<Message>();
 			this.notifications = new BlockingCollection<Notification>();
-			this.handlers = new Dictionary<uint, MessageHandler<ContextType>>();
+			this.authenticatedHandlers = new Dictionary<uint, MessageHandler<ContextType>>();
+			this.unauthenticatedHandlers = new Dictionary<uint, MessageHandler<ContextType>>();
 			this.sources = new List<MessageSource>();
 			this.incomingWorker = new Task(this.ProcessIncomingMessages, TaskCreationOptions.LongRunning);
 			this.outgoingWorker = new Task(this.ProcessOutgoingMessages, TaskCreationOptions.LongRunning);
@@ -53,18 +55,19 @@ namespace ArkeIndustries.RequestServer {
 
 			foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies()) {
 				var childClasses = assembly.GetTypes().Where(t => t.GetType() != type && type.IsAssignableFrom(t));
-				var matchingClasses = childClasses.Where(c => c.IsDefined(typeof(MessageServerAttribute)) && c.GetCustomAttribute<MessageServerAttribute>().ServerId == serverId);
+				var matchingClasses = childClasses.Where(c => c.IsDefined(typeof(MessageDefinitionAttribute)) && c.GetCustomAttribute<MessageDefinitionAttribute>().ServerId == serverId);
 
 				foreach (var c in matchingClasses) {
 					var handler = (MessageHandler<ContextType>)c.GetConstructor(Type.EmptyTypes).Invoke(null);
 					var key = handler.GetKey();
+					var handlers = c.GetCustomAttribute<MessageDefinitionAttribute>().AuthenticationRequired ? this.authenticatedHandlers : this.unauthenticatedHandlers;
 
-					if (this.handlers.ContainsKey(key))
+					if (handlers.ContainsKey(key))
 						throw new InvalidOperationException("This method is already defined.");
 
 					handler.Context = this.Context;
 
-					this.handlers.Add(key, handler);
+					handlers.Add(key, handler);
 				}
 			}
 		}
@@ -121,16 +124,18 @@ namespace ArkeIndustries.RequestServer {
 
 					if (requestHeader.BodyLength + MessageHeader.Length == message.Data.Length) {
 						var key = MessageHandler<ContextType>.GetKey(requestHeader.Category, requestHeader.Method);
+						var handlers = message.Connection.AuthenticatedId != 0 ? this.authenticatedHandlers : this.unauthenticatedHandlers;
+						var opposite = message.Connection.AuthenticatedId != 0 ? this.unauthenticatedHandlers : this.authenticatedHandlers;
 
-						if (this.handlers.ContainsKey(key)) {
-							var handler = this.handlers[key];
+                        if (handlers.ContainsKey(key)) {
+							var handler = handlers[key];
 
 							handler.AuthenticatedId = message.Connection.AuthenticatedId;
 
+							handler.Context.BeginMessage();
+
 							try {
 								handler.Deserialize<MessageInputAttribute>(requestReader);
-
-								handler.Context.BeginMessage();
 
 								if (handler.IsValid()) {
 									responseHeader.ResponseCode = handler.Perform();
@@ -172,6 +177,9 @@ namespace ArkeIndustries.RequestServer {
 							this.SentMessages += handler.Notifications.Count;
 
 							handler.Notifications.Clear();
+						}
+						else if (opposite.ContainsKey(key)) {
+							responseHeader.ResponseCode = ResponseCode.NotAuthorized;
 						}
 						else {
 							responseHeader.ResponseCode = ResponseCode.WrongMethod;

@@ -19,8 +19,9 @@ namespace ArkeIndustries.RequestServer {
 	}
 
 	[AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
-	public class MessageServerAttribute : Attribute {
+	public class MessageDefinitionAttribute : Attribute {
 		public int ServerId { get; set; }
+		public bool AuthenticationRequired { get; set; }
 	}
 
 	[AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
@@ -40,6 +41,8 @@ namespace ArkeIndustries.RequestServer {
 
 	public abstract class MessageHandler<ContextType> {
 		public static DateTime DateTimeEpoch = new DateTime(2015, 1, 1, 0, 0, 0);
+
+		public bool AuthenticationRequired { get; set; }
 
 		public long AuthenticatedId { get; set; }
 		public ContextType Context { get; set; }
