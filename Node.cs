@@ -125,7 +125,6 @@ namespace ArkeIndustries.RequestServer {
 						if (this.handlers.ContainsKey(key)) {
 							var handler = this.handlers[key];
 
-							handler.Notifications.Clear();
 							handler.AuthenticatedId = message.Connection.AuthenticatedId;
 
 							try {
@@ -166,6 +165,13 @@ namespace ArkeIndustries.RequestServer {
 
 							if (responseHeader.ResponseCode == ResponseCode.Success)
 								handler.Serialize<MessageOutputAttribute>(responseWriter);
+
+							foreach (var n in handler.Notifications)
+								this.notifications.Add(n);
+
+							this.SentMessages += handler.Notifications.Count;
+
+							handler.Notifications.Clear();
 						}
 						else {
 							responseHeader.ResponseCode = ResponseCode.WrongMethod;
@@ -206,8 +212,8 @@ namespace ArkeIndustries.RequestServer {
 
 		private void ProcessNotifications() {
 			Notification notification;
-			Message message = new Message(null, new byte[MessageHeader.Length], 0);
-			var writer = new BinaryWriter(new MemoryStream(message.Data));
+			var buffer = new byte[MessageHeader.Length];
+			var writer = new BinaryWriter(new MemoryStream(buffer));
 
 			while (!this.cancellationSource.IsCancellationRequested) {
 				try {
@@ -217,12 +223,14 @@ namespace ArkeIndustries.RequestServer {
 					break;
 				}
 
-				writer.Seek(0, SeekOrigin.Begin);
+				foreach (var c in this.FindConnectionsForAuthenticatedId(notification.TargetAuthenticatedId)) {
+					writer.Seek(0, SeekOrigin.Begin);
 
-				notification.Serialize(writer);
+					notification.Serialize(writer);
 
-				foreach (var c in this.FindConnectionsForAuthenticatedId(notification.TargetAuthenticatedId))
-					c.Send(message);
+					this.outgoingMessages.Add(new Message(c, buffer, buffer.Length));
+
+				}
 			}
 		}
 

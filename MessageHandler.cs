@@ -23,17 +23,17 @@ namespace ArkeIndustries.RequestServer {
 		public int ServerId { get; set; }
 	}
 
-	[AttributeUsage(AttributeTargets.Field)]
+	[AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
 	public class MessageParameterAttribute : Attribute {
 		public int Index { get; set; }
 	}
 
-	[AttributeUsage(AttributeTargets.Field)]
+	[AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
 	public class MessageInputAttribute : MessageParameterAttribute {
 
 	}
 
-	[AttributeUsage(AttributeTargets.Field)]
+	[AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
 	public class MessageOutputAttribute : MessageParameterAttribute {
 
 	}
@@ -56,58 +56,58 @@ namespace ArkeIndustries.RequestServer {
 			this.Context = default(ContextType);
 		}
 
-		private static List<FieldInfo> GetFields<AttributeType>(object o) where AttributeType : MessageParameterAttribute {
-			return o.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance).Where(p => p.IsDefined(typeof(AttributeType))).OrderBy(p => p.GetCustomAttribute<AttributeType>().Index).ToList();
+		private static List<PropertyInfo> GetProperties<AttributeType>(object o) where AttributeType : MessageParameterAttribute {
+			return o.GetType().GetProperties(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance).Where(p => p.IsDefined(typeof(AttributeType))).OrderBy(p => p.GetCustomAttribute<AttributeType>().Index).ToList();
 		}
 
 		public void Deserialize<AttributeType>(BinaryReader reader) where AttributeType : MessageParameterAttribute {
-			MessageHandler<ContextType>.GetFields<AttributeType>(this).ForEach(f => MessageHandler<ContextType>.Deserialize<AttributeType>(reader, f, this));
+			MessageHandler<ContextType>.GetProperties<AttributeType>(this).ForEach(f => MessageHandler<ContextType>.Deserialize<AttributeType>(reader, f, this));
 		}
 
         public void Serialize<AttributeType>(BinaryWriter writer) where AttributeType : MessageParameterAttribute {
-			MessageHandler<ContextType>.GetFields<AttributeType>(this).ForEach(f => MessageHandler<ContextType>.Serialize<AttributeType>(writer, f, this));
+			MessageHandler<ContextType>.GetProperties<AttributeType>(this).ForEach(f => MessageHandler<ContextType>.Serialize<AttributeType>(writer, f, this));
 		}
 
-		private static void Deserialize<AttributeType>(BinaryReader reader, FieldInfo field, object o) where AttributeType : MessageParameterAttribute {
-			if (field.FieldType == typeof(string)) {
-				field.SetValue(o, reader.ReadString());
+		private static void Deserialize<AttributeType>(BinaryReader reader, PropertyInfo property, object o) where AttributeType : MessageParameterAttribute {
+			if (property.PropertyType == typeof(string)) {
+				property.SetValue(o, reader.ReadString());
 			}
-			else if (field.FieldType == typeof(byte)) {
-				field.SetValue(o, reader.ReadByte());
+			else if (property.PropertyType == typeof(byte)) {
+				property.SetValue(o, reader.ReadByte());
 			}
-			else if (field.FieldType == typeof(sbyte)) {
-				field.SetValue(o, reader.ReadSByte());
+			else if (property.PropertyType == typeof(sbyte)) {
+				property.SetValue(o, reader.ReadSByte());
 			}
-			else if (field.FieldType == typeof(ushort)) {
-				field.SetValue(o, reader.ReadUInt16());
+			else if (property.PropertyType == typeof(ushort)) {
+				property.SetValue(o, reader.ReadUInt16());
 			}
-			else if (field.FieldType == typeof(short)) {
-				field.SetValue(o, reader.ReadInt16());
+			else if (property.PropertyType == typeof(short)) {
+				property.SetValue(o, reader.ReadInt16());
 			}
-			else if (field.FieldType == typeof(uint)) {
-				field.SetValue(o, reader.ReadUInt32());
+			else if (property.PropertyType == typeof(uint)) {
+				property.SetValue(o, reader.ReadUInt32());
 			}
-			else if (field.FieldType == typeof(int)) {
-				field.SetValue(o, reader.ReadInt32());
+			else if (property.PropertyType == typeof(int)) {
+				property.SetValue(o, reader.ReadInt32());
 			}
-			else if (field.FieldType == typeof(ulong)) {
-				field.SetValue(o, reader.ReadUInt64());
+			else if (property.PropertyType == typeof(ulong)) {
+				property.SetValue(o, reader.ReadUInt64());
 			}
-			else if (field.FieldType == typeof(long)) {
-				field.SetValue(o, reader.ReadInt64());
+			else if (property.PropertyType == typeof(long)) {
+				property.SetValue(o, reader.ReadInt64());
 			}
-			else if (field.FieldType == typeof(DateTime)) {
-				field.SetValue(o, MessageHandler<ContextType>.DateTimeEpoch.AddMilliseconds(reader.ReadUInt64() * TimeSpan.TicksPerMillisecond));
+			else if (property.PropertyType == typeof(DateTime)) {
+				property.SetValue(o, MessageHandler<ContextType>.DateTimeEpoch.AddMilliseconds(reader.ReadUInt64()));
 			}
 			else {
-				if (field.FieldType.GetInterfaces().Any(i => i == typeof(IList))) {
-					var collection = (IList)field.GetValue(o);
+				if (property.PropertyType.GetInterfaces().Any(i => i == typeof(IList))) {
+					var collection = (IList)property.GetValue(o);
 					var generic = collection.GetType().GenericTypeArguments[0];
 					var constructor = generic.GetConstructor(Type.EmptyTypes);
 
 					collection.Clear();
 
-					var fields = MessageHandler<ContextType>.GetFields<AttributeType>(constructor.Invoke(null));
+					var fields = MessageHandler<ContextType>.GetProperties<AttributeType>(constructor.Invoke(null));
 					var count = reader.ReadUInt16();
 
 					for (var i = 0; i < count; i++) {
@@ -121,48 +121,48 @@ namespace ArkeIndustries.RequestServer {
 					}
 				}
 				else {
-					var child = field.GetValue(o);
+					var child = property.GetValue(o);
 
-					MessageHandler<ContextType>.GetFields<AttributeType>(child).ForEach(f => MessageHandler<ContextType>.Deserialize<AttributeType>(reader, f, child));
+					MessageHandler<ContextType>.GetProperties<AttributeType>(child).ForEach(f => MessageHandler<ContextType>.Deserialize<AttributeType>(reader, f, child));
 				}
 			}
 		}
 
-		private static void Serialize<AttributeType>(BinaryWriter writer, FieldInfo field, object o) where AttributeType : MessageParameterAttribute {
-			var child = field.GetValue(o);
+		private static void Serialize<AttributeType>(BinaryWriter writer, PropertyInfo property, object o) where AttributeType : MessageParameterAttribute {
+			var child = property.GetValue(o);
 
-			if (field.FieldType == typeof(string)) {
+			if (property.PropertyType == typeof(string)) {
 				writer.Write((string)child);
 			}
-			else if (field.FieldType == typeof(byte)) {
+			else if (property.PropertyType == typeof(byte)) {
 				writer.Write((byte)child);
 			}
-			else if (field.FieldType == typeof(sbyte)) {
+			else if (property.PropertyType == typeof(sbyte)) {
 				writer.Write((sbyte)child);
 			}
-			else if (field.FieldType == typeof(ushort)) {
+			else if (property.PropertyType == typeof(ushort)) {
 				writer.Write((ushort)child);
 			}
-			else if (field.FieldType == typeof(short)) {
+			else if (property.PropertyType == typeof(short)) {
 				writer.Write((short)child);
 			}
-			else if (field.FieldType == typeof(uint)) {
+			else if (property.PropertyType == typeof(uint)) {
 				writer.Write((uint)child);
 			}
-			else if (field.FieldType == typeof(int)) {
+			else if (property.PropertyType == typeof(int)) {
 				writer.Write((int)child);
 			}
-			else if (field.FieldType == typeof(ulong)) {
+			else if (property.PropertyType == typeof(ulong)) {
 				writer.Write((ulong)child);
 			}
-			else if (field.FieldType == typeof(long)) {
+			else if (property.PropertyType == typeof(long)) {
 				writer.Write((long)child);
 			}
-			else if (field.FieldType == typeof(DateTime)) {
+			else if (property.PropertyType == typeof(DateTime)) {
 				writer.Write((ulong)((DateTime)child - MessageHandler<ContextType>.DateTimeEpoch).TotalMilliseconds);
 			}
 			else {
-				if (field.FieldType.GetInterfaces().Any(i => i == typeof(IList))) {
+				if (property.PropertyType.GetInterfaces().Any(i => i == typeof(IList))) {
 					var collection = (IList)child;
 
 					writer.Write((ushort)collection.Count);
@@ -170,7 +170,7 @@ namespace ArkeIndustries.RequestServer {
 					if (collection.Count == 0)
 						return;
 
-					var fields = MessageHandler<ContextType>.GetFields<AttributeType>(collection[0]);
+					var fields = MessageHandler<ContextType>.GetProperties<AttributeType>(collection[0]);
 
 					for (var i = 0; i < collection.Count; i++)
 					    fields.ForEach(f => MessageHandler<ContextType>.Serialize<AttributeType>(writer, f, collection[i]));
@@ -178,13 +178,13 @@ namespace ArkeIndustries.RequestServer {
 					collection.Clear();
 				}
 				else {
-					MessageHandler<ContextType>.GetFields<AttributeType>(child).ForEach(f => MessageHandler<ContextType>.Serialize<AttributeType>(writer, f, child));
+					MessageHandler<ContextType>.GetProperties<AttributeType>(child).ForEach(f => MessageHandler<ContextType>.Serialize<AttributeType>(writer, f, child));
 				}
 			}
 		}
 
 		public virtual bool IsValid() {
-			return !this.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance).Where(p => p.IsDefined(typeof(ValidationAttribute))).Any(f => f.GetCustomAttributes<ValidationAttribute>().Any(a => !a.IsValid(f.GetValue(this))));
+			return !this.GetType().GetProperties(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance).Where(p => p.IsDefined(typeof(ValidationAttribute))).Any(f => f.GetCustomAttributes<ValidationAttribute>().Any(a => !a.IsValid(f.GetValue(this))));
 		}
 
 		public static uint GetKey(ushort category, ushort method) {
@@ -201,6 +201,8 @@ namespace ArkeIndustries.RequestServer {
 	}
 
 	public abstract class ListQueryMessageHandler<ContextType, QueryType> : MessageHandler<ContextType> {
+		protected const int StartIndex = 4;
+
 		[MessageInput(Index = 0)]
 		[DataAnnotations.AtLeast(0)]
 		protected uint skip;
