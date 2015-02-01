@@ -64,13 +64,16 @@ namespace ArkeIndustries.RequestServer {
 			MessageHandler<ContextType>.GetProperties<AttributeType>(this).ForEach(f => MessageHandler<ContextType>.Deserialize<AttributeType>(reader, f, this));
 		}
 
-        public void Serialize<AttributeType>(BinaryWriter writer) where AttributeType : MessageParameterAttribute {
+		public void Serialize<AttributeType>(BinaryWriter writer) where AttributeType : MessageParameterAttribute {
 			MessageHandler<ContextType>.GetProperties<AttributeType>(this).ForEach(f => MessageHandler<ContextType>.Serialize<AttributeType>(writer, f, this));
 		}
 
 		private static void Deserialize<AttributeType>(BinaryReader reader, PropertyInfo property, object o) where AttributeType : MessageParameterAttribute {
 			if (property.PropertyType == typeof(string)) {
 				property.SetValue(o, reader.ReadString());
+			}
+			else if (property.PropertyType == typeof(bool)) {
+				property.SetValue(o, reader.ReadBoolean());
 			}
 			else if (property.PropertyType == typeof(byte)) {
 				property.SetValue(o, reader.ReadByte());
@@ -101,24 +104,23 @@ namespace ArkeIndustries.RequestServer {
 			}
 			else {
 				if (property.PropertyType.GetInterfaces().Any(i => i == typeof(IList))) {
-					var collection = (IList)property.GetValue(o);
-					var generic = collection.GetType().GenericTypeArguments[0];
-					var constructor = generic.GetConstructor(Type.EmptyTypes);
+					var itemType = property.PropertyType.GenericTypeArguments[0];
+					var itemConstructor = itemType.GetConstructor(Type.EmptyTypes);
+					var propertyConstructor = property.PropertyType.GetConstructor(Type.EmptyTypes);
+					var collection = (IList)propertyConstructor.Invoke(null);
 
-					collection.Clear();
-
-					var fields = MessageHandler<ContextType>.GetProperties<AttributeType>(constructor.Invoke(null));
+					var fields = MessageHandler<ContextType>.GetProperties<AttributeType>(itemConstructor.Invoke(null));
 					var count = reader.ReadUInt16();
 
 					for (var i = 0; i < count; i++) {
-						foreach (var f in fields) {
-							var newObject = constructor.Invoke(null);
+						var newObject = itemConstructor.Invoke(null);
 
-							MessageHandler<ContextType>.Deserialize<AttributeType>(reader, f, newObject);
+						fields.ForEach(f => MessageHandler<ContextType>.Deserialize<AttributeType>(reader, f, newObject));
 
-							collection.Add(newObject);
-						}
+						collection.Add(newObject);
 					}
+
+					property.SetValue(o, collection);
 				}
 				else {
 					var child = property.GetValue(o);
@@ -133,6 +135,9 @@ namespace ArkeIndustries.RequestServer {
 
 			if (property.PropertyType == typeof(string)) {
 				writer.Write((string)child);
+			}
+			else if (property.PropertyType == typeof(bool)) {
+				writer.Write((bool)child);
 			}
 			else if (property.PropertyType == typeof(byte)) {
 				writer.Write((byte)child);
@@ -173,7 +178,7 @@ namespace ArkeIndustries.RequestServer {
 					var fields = MessageHandler<ContextType>.GetProperties<AttributeType>(collection[0]);
 
 					for (var i = 0; i < collection.Count; i++)
-					    fields.ForEach(f => MessageHandler<ContextType>.Serialize<AttributeType>(writer, f, collection[i]));
+						fields.ForEach(f => MessageHandler<ContextType>.Serialize<AttributeType>(writer, f, collection[i]));
 
 					collection.Clear();
 				}
@@ -200,36 +205,36 @@ namespace ArkeIndustries.RequestServer {
 		}
 	}
 
-	public abstract class ListQueryMessageHandler<ContextType, QueryType> : MessageHandler<ContextType> {
-		protected const int StartIndex = 4;
+	public abstract class ListQueryMessageHandler<ContextType, EntryType> : MessageHandler<ContextType> where EntryType : class {
+		public const int InputStartIndex = 4;
+		public const int OutputStartIndex = 1;
 
 		[MessageInput(Index = 0)]
 		[DataAnnotations.AtLeast(0)]
-		protected uint skip;
+		public uint Skip { get; set; }
 
 		[MessageInput(Index = 1)]
 		[DataAnnotations.AtLeast(0)]
-		protected uint take;
+		public uint Take { get; set; }
 
 		[MessageInput(Index = 2)]
 		[DataAnnotations.ApiString]
-		protected string orderByField;
+		public string OrderByField { get; set; }
 
 		[MessageInput(Index = 3)]
-		protected bool orderByAscending;
+		public bool OrderByAscending { get; set; }
 
 		[MessageOutput(Index = 0)]
-		protected List<QueryType> entries;
+		public List<EntryType> Entries { get; set; }
 
-		protected void OrderTakeAndSet(IQueryable<QueryType> query) {
-			var prop = typeof(QueryType).GetProperty(this.orderByField);
+		protected void OrderTakeAndSet(IQueryable<EntryType> query) {
+			var parameter = Expression.Parameter(typeof(EntryType));
+			var property = Expression.Property(parameter, this.OrderByField);
+			var sort = Expression.Lambda(property, parameter);
+			var quote = Expression.Quote(sort);
+            var call = Expression.Call(typeof(Queryable), this.OrderByAscending ? "OrderBy" : "OrderByDescending", new[] { typeof(EntryType), property.Type }, query.Expression, quote);
 
-			if (prop == null)
-				throw new ListQueryValidationFailedException();
-
-			query = this.orderByAscending ? query.OrderBy(e => prop.GetValue(e)) : query.OrderByDescending(e => prop.GetValue(e));
-				
-			this.entries = query.Skip((int)this.skip).Take((int)this.take).ToList();
+			this.Entries = query.Provider.CreateQuery<EntryType>(call).Skip((int)this.Skip).Take((int)this.Take).ToList();
 		}
 	}
 }
