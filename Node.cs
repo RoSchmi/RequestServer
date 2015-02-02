@@ -55,7 +55,7 @@ namespace ArkeIndustries.RequestServer {
 
 			foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies()) {
 				var childClasses = assembly.GetTypes().Where(t => t.GetType() != type && type.IsAssignableFrom(t));
-				var matchingClasses = childClasses.Where(c => c.IsDefined(typeof(MessageDefinitionAttribute)) && c.GetCustomAttribute<MessageDefinitionAttribute>().ServerId == serverId);
+				var matchingClasses = childClasses.Where(c => c.IsDefined(typeof(MessageDefinitionAttribute)) && ((c.GetCustomAttribute<MessageDefinitionAttribute>().ServerId & serverId) != 0));
 
 				foreach (var c in matchingClasses) {
 					var handler = (MessageHandler<ContextType>)c.GetConstructor(Type.EmptyTypes).Invoke(null);
