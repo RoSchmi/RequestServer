@@ -223,7 +223,7 @@ namespace ArkeIndustries.RequestServer {
 		public uint Take { get; set; }
 
 		[MessageInput(Index = 2)]
-		[DataAnnotations.ApiString]
+		[DataAnnotations.ApiString(MinLength = 1)]
 		public string OrderByField { get; set; }
 
 		[MessageInput(Index = 3)]
