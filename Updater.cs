@@ -3,7 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 
 namespace ArkeIndustries.RequestServer {
-	public abstract class Updater<ContextType> {
+	public abstract class Updater<ContextType> where ContextType : MessageContext {
 		private Task worker;
 
 		public CancellationToken CancellationToken { get; set; }
@@ -31,7 +31,13 @@ namespace ArkeIndustries.RequestServer {
 					break;
 				}
 
+				this.Context.BeginMessage();
+
 				this.Tick(now, (ulong)((now - this.LastRun).TotalMilliseconds));
+
+				this.Context.SaveChanges();
+
+				this.Context.EndMessage();
 
 				this.LastRun = now;
 			}
