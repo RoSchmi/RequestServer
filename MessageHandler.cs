@@ -51,7 +51,9 @@ namespace ArkeIndustries.RequestServer {
 		public abstract ushort Category { get; }
 		public abstract ushort Method { get; }
 
-		public abstract ushort Perform();
+		public virtual ushort Perform() {
+			return ResponseCode.Success;
+		}
 
 		public MessageHandler() {
 			this.Notifications = new List<Notification>();
