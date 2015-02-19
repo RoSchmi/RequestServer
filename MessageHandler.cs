@@ -61,6 +61,17 @@ namespace ArkeIndustries.RequestServer {
 			this.Context = default(ContextType);
 		}
 
+		protected void BindResponseObject(object o) {
+			var objectProperties = o.GetType().GetProperties();
+
+			foreach (var p in MessageHandler<ContextType>.GetProperties<MessageOutputAttribute>(this)) {
+				var objectProperty = objectProperties.SingleOrDefault(op => op.Name == p.Name);
+
+				if (objectProperty != null)
+					p.SetValue(this, Convert.ChangeType(objectProperty.GetValue(o), objectProperty.PropertyType));
+			}
+		}
+
 		private static List<PropertyInfo> GetProperties<AttributeType>(object o) where AttributeType : MessageParameterAttribute {
 			return o.GetType().GetProperties(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance).Where(p => p.IsDefined(typeof(AttributeType))).OrderBy(p => p.GetCustomAttribute<AttributeType>().Index).ToList();
 		}
