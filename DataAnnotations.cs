@@ -67,4 +67,16 @@ namespace ArkeIndustries.RequestServer.DataAnnotations {
 			return this.Optional ? (long)value >= 0 : (long)value > 0;
 		}
 	}
+
+	public class InEnumAttribute : ValidationAttribute {
+		public Type Type { get; set; }
+
+		public InEnumAttribute(Type type) {
+			this.Type = type;
+		}
+
+		public override bool IsValid(object value) {
+			return Enum.IsDefined(this.Type, value);
+		}
+	}
 }
