@@ -5,11 +5,16 @@ using System.Threading.Tasks;
 namespace ArkeIndustries.RequestServer {
 	public abstract class Updater<ContextType> where ContextType : MessageContext {
 		private Task worker;
+		private Node<ContextType> node;
 
 		public CancellationToken CancellationToken { get; set; }
 		public TimeSpan Interval { get; set; }
-		public DateTime LastRun { get; set; }
-		public ContextType Context { get; set; }
+
+		protected ContextType Context { get { return this.node.Context; } }
+
+		public Updater(Node<ContextType> node) {
+			this.node = node;
+		}
 
 		public void Start() {
 			this.worker = new Task(this.DoWork, this.CancellationToken, TaskCreationOptions.LongRunning);
@@ -21,28 +26,32 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		private void DoWork() {
+			var next = DateTime.UtcNow;
+
 			while (!this.CancellationToken.IsCancellationRequested) {
-				var now = DateTime.UtcNow;
+				next = next.Add(this.Interval);
+
+				this.node.OnUpdateStarted();
+
+				this.node.Context.BeginMessage();
+
+				this.Tick();
+
+				this.node.Context.SaveChanges();
+
+				this.node.Context.EndMessage();
+
+				this.node.OnUpdateFinished();
 
 				try {
-					Task.Delay(this.Interval - (now - this.LastRun), this.CancellationToken).Wait();
+					Task.Delay(next - DateTime.UtcNow, this.CancellationToken).Wait();
 				}
 				catch (AggregateException e) if (e.InnerExceptions.Count == 1 && e.InnerExceptions[0] is TaskCanceledException) {
 					break;
 				}
-
-				this.Context.BeginMessage();
-
-				this.Tick(now, (ulong)((now - this.LastRun).TotalMilliseconds));
-
-				this.Context.SaveChanges();
-
-				this.Context.EndMessage();
-
-				this.LastRun = now;
 			}
 		}
 
-		public abstract void Tick(DateTime now, ulong millisecondsDelta);
+		public abstract void Tick();
 	}
 }

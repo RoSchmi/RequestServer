@@ -120,4 +120,10 @@ namespace ArkeIndustries.RequestServer {
 		public static ushort TryAgainLater { get; } = 7;
 		public static ushort ConcurrencyFailure { get; } = 8;
 	}
+
+	public class NotificationCode {
+		public static ushort UpdateStarted { get; } = 0;
+		public static ushort UpdateFinished { get; } = 1;
+		public static ushort ServerShuttingDown { get; } = 2;
+	}
 }

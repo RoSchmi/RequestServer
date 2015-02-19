@@ -19,6 +19,8 @@ namespace ArkeIndustries.RequestServer {
 		private Task incomingWorker;
 		private Task outgoingWorker;
 		private Task notificationWorker;
+		private AutoResetEvent updateEvent;
+		private bool updating;
 
 		public int MessageRetryAttempts { get; set; } = 5;
 		public long ReceivedMessages { get; set; }
@@ -41,6 +43,8 @@ namespace ArkeIndustries.RequestServer {
 			this.outgoingWorker = new Task(this.ProcessOutgoingMessages, TaskCreationOptions.LongRunning);
 			this.notificationWorker = new Task(this.ProcessNotifications, TaskCreationOptions.LongRunning);
 			this.cancellationSource = new CancellationTokenSource();
+			this.updateEvent = new AutoResetEvent(false);
+			this.updating = false;
 		}
 
 		public void AddSource(MessageSource source) {
@@ -86,6 +90,8 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		public void Stop() {
+			this.NotifyAll(NotificationCode.ServerShuttingDown);
+
 			this.cancellationSource.Cancel();
 
 			this.sources.ForEach(s => s.Stop());
@@ -97,6 +103,20 @@ namespace ArkeIndustries.RequestServer {
 			this.Updater?.Stop();
 		}
 
+		internal void OnUpdateStarted() {
+			this.updating = true;
+
+			this.NotifyAll(NotificationCode.UpdateStarted);
+		}
+
+		internal void OnUpdateFinished() {
+			this.NotifyAll(NotificationCode.UpdateFinished);
+
+			this.updating = false;
+
+			this.updateEvent.Set();
+		}
+
 		private void ProcessIncomingMessages() {
 			Message message;
 			var requestHeader = new RequestHeader();
@@ -105,6 +125,9 @@ namespace ArkeIndustries.RequestServer {
 			var responseWriter = new BinaryWriter(new MemoryStream(responseBuffer));
 
 			while (!this.cancellationSource.IsCancellationRequested) {
+				if (this.updating)
+					this.updateEvent.WaitOne();
+
 				try {
 					message = this.incomingMessages.Take(this.cancellationSource.Token);
 				}
@@ -205,7 +228,7 @@ namespace ArkeIndustries.RequestServer {
 		private void ProcessOutgoingMessages() {
 			Message message;
 
-			while (!this.cancellationSource.IsCancellationRequested) {
+			while (true) {
 				try {
 					message = this.outgoingMessages.Take(this.cancellationSource.Token);
 				}
@@ -215,8 +238,23 @@ namespace ArkeIndustries.RequestServer {
 
 				if (!message.Connection.Send(message) && ++message.SendAttempts <= this.MessageRetryAttempts)
 					this.outgoingMessages.Add(message);
+
+				if (this.cancellationSource.IsCancellationRequested && this.outgoingMessages.Count == 0)
+					break;
 			}
 		}
+
+		private void NotifyAll(ushort notificationType) {
+			var buffer = new byte[MessageHeader.Length];
+			var writer = new BinaryWriter(new MemoryStream(buffer));
+
+			new Notification(0, notificationType, 0).Serialize(writer);
+
+			foreach (var s in this.sources)
+				lock (s.Connections)
+					foreach (var c in s.Connections)
+						this.outgoingMessages.Add(new Message(c, buffer, buffer.Length));
+        }
 
 		private void ProcessNotifications() {
 			Notification notification;
@@ -237,7 +275,6 @@ namespace ArkeIndustries.RequestServer {
 					notification.Serialize(writer);
 
 					this.outgoingMessages.Add(new Message(c, buffer, buffer.Length));
-
 				}
 			}
 		}
