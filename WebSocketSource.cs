@@ -1,7 +1,5 @@
 ﻿using System;
-using System.IO;
 using System.Net;
-using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,13 +15,13 @@ namespace ArkeIndustries.RequestServer.Sources {
 
 		public override Connection AcceptConnection() {
 			try {
-				var ws = this.listener.GetContext().AcceptWebSocketAsync("");
+				var ws = this.listener.GetContext().AcceptWebSocketAsync(null);
 
 				ws.Wait();
 
 				return new WebSocketConnection(this.CancellationToken, ws.Result.WebSocket);
 			}
-			catch (HttpListenerException e) if (e.ErrorCode == 995) {
+			catch (HttpListenerException e) when (e.ErrorCode == 995) {
 				return null;
 			}
 		}
@@ -35,9 +33,9 @@ namespace ArkeIndustries.RequestServer.Sources {
 		}
 
 		public override void Stop() {
-			base.Stop();
-
 			this.listener.Stop();
+
+			base.Stop();
 		}
 	}
 
@@ -63,11 +61,11 @@ namespace ArkeIndustries.RequestServer.Sources {
 		}
 
 		protected override async Task<int> Receive(byte[] buffer, int offset, int length) {
-			if (this.disposed || this.client.State == WebSocketState.Open)
+			if (this.disposed || this.client.State != WebSocketState.Open)
 				return 0;
 
 			try {
-				var result = await this.client.ReceiveAsync(new ArraySegment<byte>(buffer, offset, length), this.cancellationToken);
+				var result = await this.client.ReceiveAsync(new ArraySegment<byte>(buffer, offset, length), CancellationToken.None);
 
 				return result.MessageType == WebSocketMessageType.Binary ? result.Count : 0;
 			}
@@ -81,6 +79,7 @@ namespace ArkeIndustries.RequestServer.Sources {
 		protected override void Dispose(bool disposing) {
 			if (!this.disposed) {
 				if (disposing) {
+					this.client.CloseAsync(WebSocketCloseStatus.EndpointUnavailable, "Server shutting down.", CancellationToken.None).Wait(1000);
 					this.client.Dispose();
 				}
 			}

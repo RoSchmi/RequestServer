@@ -46,7 +46,7 @@ namespace ArkeIndustries.RequestServer {
 				try {
 					Task.Delay(next - DateTime.UtcNow, this.CancellationToken).Wait();
 				}
-				catch (AggregateException e) if (e.InnerExceptions.Count == 1 && e.InnerExceptions[0] is TaskCanceledException) {
+				catch (AggregateException e) when (e.InnerExceptions.Count == 1 && e.InnerExceptions[0] is TaskCanceledException) {
 					break;
 				}
 			}

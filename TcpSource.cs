@@ -17,7 +17,7 @@ namespace ArkeIndustries.RequestServer.Sources {
 			try {
 				return new TcpConnection(this.CancellationToken, this.listener.AcceptTcpClient());
 			}
-			catch (SocketException e) if (e.SocketErrorCode == SocketError.Interrupted) {
+			catch (SocketException e) when (e.SocketErrorCode == SocketError.Interrupted) {
 				return null;
 			}
 		}
@@ -29,9 +29,9 @@ namespace ArkeIndustries.RequestServer.Sources {
 		}
 
 		public override void Stop() {
-			base.Stop();
-
 			this.listener.Stop();
+
+			base.Stop();
 		}
 	}
 

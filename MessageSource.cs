@@ -9,7 +9,7 @@ namespace ArkeIndustries.RequestServer {
 
 		public CancellationToken CancellationToken { get; set; }
 		public BlockingCollection<Message> MessageDestination { get; set; }
-		public List<Connection> Connections{ get; }
+		public List<Connection> Connections { get; }
 
 		public MessageSource() {
 			this.worker = new Task(this.ProcessPendingClients, TaskCreationOptions.LongRunning);

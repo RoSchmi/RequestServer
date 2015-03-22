@@ -94,11 +94,11 @@ namespace ArkeIndustries.RequestServer {
 
 			this.cancellationSource.Cancel();
 
-			this.sources.ForEach(s => s.Stop());
-
 			this.incomingWorker.Wait();
 			this.outgoingWorker.Wait();
 			this.notificationWorker.Wait();
+
+			this.sources.ForEach(s => s.Stop());
 
 			this.Updater?.Stop();
 		}

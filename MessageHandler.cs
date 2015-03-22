@@ -221,7 +221,7 @@ namespace ArkeIndustries.RequestServer {
 		}
 	}
 
-	public abstract class ListQueryMessageHandler<ContextType, EntryType> : MessageHandler<ContextType> where EntryType : class {
+	public abstract class ListQueryMessageHandler<ContextType, EntryType> : MessageHandler<ContextType> {
 		public const int InputStartIndex = 4;
 		public const int OutputStartIndex = 1;
 
