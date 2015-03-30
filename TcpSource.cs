@@ -44,15 +44,19 @@ namespace ArkeIndustries.RequestServer.Sources {
 			this.stream = client.GetStream();
 		}
 
-		protected override bool Send(byte[] buffer, int offset, int length) {
-			if (this.disposed)
+		protected override async Task<bool> Send(MemoryStream stream, long offset, long length) {
+			if (this.Disposed)
 				return true;
 
 			if (!this.stream.CanWrite)
 				return false;
 
+			stream.Seek(offset, SeekOrigin.Begin);
+
 			try {
-				this.stream.Write(buffer, offset, length);
+				await this.stream.WriteAsync(stream.GetBuffer(), (int)offset, (int)length, this.CancellationToken);
+
+				return true;
 			}
 			catch (IOException) {
 
@@ -61,12 +65,12 @@ namespace ArkeIndustries.RequestServer.Sources {
 
 			}
 
-			return true;
+			return false;
 		}
 
-		protected override async Task<int> Receive(byte[] buffer, int offset, int length) {
+		protected override async Task<int> Receive(MemoryStream stream, long offset, long length) {
 			try {
-				return await this.stream.ReadAsync(buffer, offset, length, this.cancellationToken);
+				return await this.stream.ReadAsync(stream.GetBuffer(), (int)offset, (int)length, this.CancellationToken);
 			}
 			catch (IOException) {
 
@@ -76,7 +80,7 @@ namespace ArkeIndustries.RequestServer.Sources {
 		}
 
 		protected override void Dispose(bool disposing) {
-			if (!this.disposed) {
+			if (!this.Disposed) {
 				if (disposing) {
 					this.stream.Dispose();
 					this.client.Dispose();

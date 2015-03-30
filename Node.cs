@@ -11,7 +11,7 @@ namespace ArkeIndustries.RequestServer {
 	public class Node<ContextType> where ContextType : MessageContext {
 		private BlockingCollection<Message> outgoingMessages;
 		private BlockingCollection<Message> incomingMessages;
-		private BlockingCollection<Notification> notifications;
+		private BlockingCollection<Tuple<long, Message>> notifications;
 		private Dictionary<uint, MessageHandler<ContextType>> authenticatedHandlers;
 		private Dictionary<uint, MessageHandler<ContextType>> unauthenticatedHandlers;
 		private List<MessageSource> sources;
@@ -35,7 +35,7 @@ namespace ArkeIndustries.RequestServer {
 		public Node() {
 			this.outgoingMessages = new BlockingCollection<Message>();
 			this.incomingMessages = new BlockingCollection<Message>();
-			this.notifications = new BlockingCollection<Notification>();
+			this.notifications = new BlockingCollection<Tuple<long, Message>>();
 			this.authenticatedHandlers = new Dictionary<uint, MessageHandler<ContextType>>();
 			this.unauthenticatedHandlers = new Dictionary<uint, MessageHandler<ContextType>>();
 			this.sources = new List<MessageSource>();
@@ -119,10 +119,7 @@ namespace ArkeIndustries.RequestServer {
 
 		private void ProcessIncomingMessages() {
 			Message message;
-			var requestHeader = new RequestHeader();
-			var responseHeader = new ResponseHeader();
-			var responseBuffer = new byte[MessageHeader.Length + MessageHeader.MaxBodyLength];
-			var responseWriter = new BinaryWriter(new MemoryStream(responseBuffer));
+			BinaryWriter responseWriter = new BinaryWriter(new MemoryStream());
 
 			while (!this.cancellationSource.IsCancellationRequested) {
 				if (this.updating)
@@ -137,95 +134,78 @@ namespace ArkeIndustries.RequestServer {
 
 				this.ReceivedMessages++;
 
-				responseWriter.Seek(MessageHeader.Length, SeekOrigin.Begin);
+				var key = MessageHandler<ContextType>.GetKey(message.RequestCategory, message.RequestMethod);
+				var handlers = message.Connection.AuthenticatedId != 0 ? this.authenticatedHandlers : this.unauthenticatedHandlers;
+				var opposite = message.Connection.AuthenticatedId != 0 ? this.unauthenticatedHandlers : this.authenticatedHandlers;
 
-				using (var requestReader = new BinaryReader(new MemoryStream(message.Data))) {
+				if (handlers.ContainsKey(key)) {
+					var handler = handlers[key];
 
-					requestHeader.Deserialize(requestReader);
+					handler.AuthenticatedId = message.Connection.AuthenticatedId;
 
-					requestReader.BaseStream.Seek(MessageHeader.Length, SeekOrigin.Begin);
+					handler.Context.BeginMessage();
 
-					if (requestHeader.BodyLength + MessageHeader.Length == message.Data.Length) {
-						var key = MessageHandler<ContextType>.GetKey(requestHeader.Category, requestHeader.Method);
-						var handlers = message.Connection.AuthenticatedId != 0 ? this.authenticatedHandlers : this.unauthenticatedHandlers;
-						var opposite = message.Connection.AuthenticatedId != 0 ? this.unauthenticatedHandlers : this.authenticatedHandlers;
+					try {
+						using (var reader = new BinaryReader(message.Body))
+							handler.Deserialize<MessageInputAttribute>(reader);
 
-                        if (handlers.ContainsKey(key)) {
-							var handler = handlers[key];
+						if (handler.IsValid()) {
+							message.ResponseCode = handler.Perform();
 
-							handler.AuthenticatedId = message.Connection.AuthenticatedId;
+							handler.Context.SaveChanges();
 
-							handler.Context.BeginMessage();
-
-							try {
-								handler.Deserialize<MessageInputAttribute>(requestReader);
-
-								if (handler.IsValid()) {
-									responseHeader.ResponseCode = handler.Perform();
-
-									handler.Context.SaveChanges();
-
-									message.Connection.AuthenticatedId = handler.AuthenticatedId;
-								}
-								else {
-									responseHeader.ResponseCode = ResponseCode.ParameterValidationFailed;
-								}
-
-							}
-							catch (EndOfStreamException) {
-								responseHeader.ResponseCode = ResponseCode.WrongParameterNumber;
-							}
-							catch (MessageContextSaveFailedException e) {
-								if (e.CanRetry) {
-									if (++message.ProcessAttempts <= this.MessageRetryAttempts) {
-										this.incomingMessages.Add(message);
-									}
-									else {
-										responseHeader.ResponseCode = ResponseCode.TryAgainLater;
-									}
-								}
-								else {
-									responseHeader.ResponseCode = e.ResponseCode;
-								}
-							}
-
-							handler.Context.EndMessage();
-
-							if (responseHeader.ResponseCode == ResponseCode.Success)
-								handler.Serialize<MessageOutputAttribute>(responseWriter);
-
-							foreach (var n in handler.Notifications)
-								this.notifications.Add(n);
-
-							this.SentMessages += handler.Notifications.Count;
-
-							handler.Notifications.Clear();
-						}
-						else if (opposite.ContainsKey(key)) {
-							responseHeader.ResponseCode = ResponseCode.NotAuthorized;
+							message.Connection.AuthenticatedId = handler.AuthenticatedId;
 						}
 						else {
-							responseHeader.ResponseCode = ResponseCode.WrongMethod;
+							message.ResponseCode = ResponseCode.ParameterValidationFailed;
+						}
+
+					}
+					catch (EndOfStreamException) {
+						message.ResponseCode = ResponseCode.WrongParameterNumber;
+					}
+					catch (MessageContextSaveFailedException e) {
+						if (e.CanRetry) {
+							if (++message.ProcessAttempts <= this.MessageRetryAttempts) {
+								this.incomingMessages.Add(message);
+							}
+							else {
+								message.ResponseCode = ResponseCode.TryAgainLater;
+							}
+						}
+						else {
+							message.ResponseCode = e.ResponseCode;
 						}
 					}
-					else {
-						responseHeader.ResponseCode = ResponseCode.WrongParameterNumber;
-					}
 
-					responseHeader.Id = requestHeader.Id;
-					responseHeader.BodyLength = (ushort)(responseWriter.BaseStream.Position - MessageHeader.Length);
+					handler.Context.EndMessage();
 
-					responseWriter.Seek(0, SeekOrigin.Begin);
+					if (message.ResponseCode == ResponseCode.Success)
+						handler.Serialize<MessageOutputAttribute>(responseWriter);
 
-					responseHeader.Serialize(responseWriter);
+					foreach (var n in handler.Notifications)
+						this.notifications.Add(n);
 
-					this.outgoingMessages.Add(new Message(message.Connection, responseBuffer, responseHeader.BodyLength + MessageHeader.Length));
-					this.SentMessages++;
+					this.SentMessages += handler.Notifications.Count;
+
+					handler.Notifications.Clear();
 				}
+				else if (opposite.ContainsKey(key)) {
+					message.ResponseCode = ResponseCode.NotAuthorized;
+				}
+				else {
+					message.ResponseCode = ResponseCode.WrongMethod;
+				}
+
+				message.BodyLength = (ushort)(responseWriter.BaseStream.Position);
+				responseWriter.BaseStream.CopyTo(message.Body);
+
+				this.outgoingMessages.Add(message);
+				this.SentMessages++;
 			}
 		}
 
-		private void ProcessOutgoingMessages() {
+		private async void ProcessOutgoingMessages() {
 			Message message;
 
 			while (true) {
@@ -236,7 +216,7 @@ namespace ArkeIndustries.RequestServer {
 					break;
 				}
 
-				if (!message.Connection.Send(message) && ++message.SendAttempts <= this.MessageRetryAttempts)
+				if (!(await message.Connection.Send(message)) && ++message.SendAttempts <= this.MessageRetryAttempts)
 					this.outgoingMessages.Add(message);
 
 				if (this.cancellationSource.IsCancellationRequested && this.outgoingMessages.Count == 0)
@@ -245,21 +225,16 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		private void NotifyAll(ushort notificationType) {
-			var buffer = new byte[MessageHeader.Length];
-			var writer = new BinaryWriter(new MemoryStream(buffer));
-
-			new Notification(0, notificationType, 0).Serialize(writer);
+			var message = Message.CreateNotification(notificationType, 0);
 
 			foreach (var s in this.sources)
 				lock (s.Connections)
 					foreach (var c in s.Connections)
-						this.outgoingMessages.Add(new Message(c, buffer, buffer.Length));
-        }
+						this.outgoingMessages.Add(new Message(c, message.Header));
+		}
 
 		private void ProcessNotifications() {
-			Notification notification;
-			var buffer = new byte[MessageHeader.Length];
-			var writer = new BinaryWriter(new MemoryStream(buffer));
+			Tuple<long, Message> notification;
 
 			while (!this.cancellationSource.IsCancellationRequested) {
 				try {
@@ -269,13 +244,8 @@ namespace ArkeIndustries.RequestServer {
 					break;
 				}
 
-				foreach (var c in this.FindConnectionsForAuthenticatedId(notification.TargetAuthenticatedId)) {
-					writer.Seek(0, SeekOrigin.Begin);
-
-					notification.Serialize(writer);
-
-					this.outgoingMessages.Add(new Message(c, buffer, buffer.Length));
-				}
+				foreach (var c in this.FindConnectionsForAuthenticatedId(notification.Item1))
+					this.outgoingMessages.Add(new Message(c, notification.Item2.Header));
 			}
 		}
 

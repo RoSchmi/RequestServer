@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Net;
 using System.Net.WebSockets;
 using System.Threading;
@@ -46,26 +47,28 @@ namespace ArkeIndustries.RequestServer.Sources {
 			this.client = client;
 		}
 
-		protected override bool Send(byte[] buffer, int offset, int length) {
-			if (this.disposed || this.client.State != WebSocketState.Open)
-				return true;
+		protected override async Task<bool> Send(MemoryStream stream, long offset, long length) {
+			if (this.Disposed || this.client.State != WebSocketState.Open)
+				return false;
 
 			try {
-				this.client.SendAsync(new ArraySegment<byte>(buffer, offset, length), WebSocketMessageType.Binary, true, this.cancellationToken).Wait();
+				await this.client.SendAsync(new ArraySegment<byte>(stream.GetBuffer(), (int)offset, (int)length), WebSocketMessageType.Binary, true, this.CancellationToken);
+
+				return true;
 			}
 			catch (Exception) {
 
 			}
 
-			return true;
+			return false;
 		}
 
-		protected override async Task<int> Receive(byte[] buffer, int offset, int length) {
-			if (this.disposed || this.client.State != WebSocketState.Open)
+		protected override async Task<int> Receive(MemoryStream stream, long offset, long length) {
+			if (this.Disposed || this.client.State != WebSocketState.Open)
 				return 0;
 
 			try {
-				var result = await this.client.ReceiveAsync(new ArraySegment<byte>(buffer, offset, length), CancellationToken.None);
+				var result = await this.client.ReceiveAsync(new ArraySegment<byte>(stream.GetBuffer(), (int)offset, (int)length), CancellationToken.None);
 
 				return result.MessageType == WebSocketMessageType.Binary ? result.Count : 0;
 			}
@@ -77,7 +80,7 @@ namespace ArkeIndustries.RequestServer.Sources {
 		}
 
 		protected override void Dispose(bool disposing) {
-			if (!this.disposed) {
+			if (!this.Disposed) {
 				if (disposing) {
 					this.client.CloseAsync(WebSocketCloseStatus.EndpointUnavailable, "Server shutting down.", CancellationToken.None).Wait(1000);
 					this.client.Dispose();

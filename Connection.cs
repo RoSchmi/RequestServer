@@ -5,79 +5,68 @@ using System.Threading.Tasks;
 
 namespace ArkeIndustries.RequestServer {
 	public abstract class Connection : IDisposable {
-		private byte[] buffer;
-		private int readSoFar;
-		private int expectedLength;
-		private bool hasHeader;
-
-		protected bool disposed;
-		protected CancellationToken cancellationToken;
+		protected bool Disposed { get; set; }
+		protected CancellationToken CancellationToken { get; set; }
 
 		public long AuthenticatedId { get; set; }
 
 		public Connection(CancellationToken token) {
-			this.cancellationToken = token;
-			this.buffer = new byte[MessageHeader.MaxBodyLength + MessageHeader.Length];
-			this.readSoFar = 0;
-			this.expectedLength = 0;
-			this.hasHeader = false;
-			this.disposed = false;
+			this.CancellationToken = token;
+			this.Disposed = false;
 		}
 
-		public bool Send(Message message) {
-			return this.Send(message.Data, 0, message.Data.Length);
+		public async Task<bool> Send(Message message) {
+			message.SerializeHeader();
+
+			return await this.Send(message.Header, 0, message.Header.Length);
 		}
 
 		public async Task<Message> Receive() {
-			this.expectedLength = 0;
-			this.hasHeader = false;
+			var message = await this.ReceiveHeader();
+			var readSoFar = 0;
+
+			if (message == null)
+				return null;
 
 			while (true) {
-				var read = 0;
-
-				try {
-					read = await this.Receive(this.buffer, this.readSoFar, this.buffer.Length - this.readSoFar);
-				}
-				catch (IOException) {
-					break;
-				}
+				var read = await this.Receive(message.Body, readSoFar, message.BodyLength - readSoFar);
 
 				if (read == 0)
-					break;
+					return null;
 
-				this.readSoFar += read;
-				this.hasHeader = this.readSoFar >= MessageHeader.Length;
+				readSoFar += read;
 
-				if (!this.hasHeader)
+				if (readSoFar == message.BodyLength)
+					return message;
+			}
+		}
+
+		private async Task<Message> ReceiveHeader() {
+			var readSoFar = 0;
+			var message = new Message();
+
+			while (true) {
+				var read = await this.Receive(message.Header, readSoFar, message.Header.Length - readSoFar);
+
+				if (read == 0)
+					return null;
+
+				readSoFar += read;
+
+				if (readSoFar != message.Header.Length)
 					continue;
 
-				if (this.expectedLength == 0)
-					this.expectedLength = MessageHeader.ExtractBodyLength(this.buffer) + MessageHeader.Length;
-
-				if (this.readSoFar < this.expectedLength)
-					continue;
-
-				if (this.expectedLength > MessageHeader.MaxBodyLength + MessageHeader.Length)
-					break;
-
-				var message = new Message(this, this.buffer, this.expectedLength);
-
-				Array.Copy(this.buffer, this.expectedLength, this.buffer, 0, this.readSoFar - this.expectedLength);
-
-				this.readSoFar -= this.expectedLength;
+				message.DeserializeHeader();
 
 				return message;
 			}
-
-			return null;
 		}
 
-		protected abstract bool Send(byte[] buffer, int offset, int length);
-		protected abstract Task<int> Receive(byte[] buffer, int offset, int length);
-
+		protected abstract Task<bool> Send(MemoryStream stream, long offset, long length);
+		protected abstract Task<int> Receive(MemoryStream stream, long offset, long length);
 
 		protected virtual void Dispose(bool disposing) {
-			this.disposed = true;
+			this.Disposed = true;
 		}
 
 		public void Dispose() {

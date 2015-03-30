@@ -1,111 +1,82 @@
-﻿using System;
-using System.IO;
+﻿using System.IO;
 
 namespace ArkeIndustries.RequestServer {
 	public class Message {
-		public byte[] Data { get; }
-		public Connection Connection { get; }
+		private static int HeaderLength { get; } = 24;
+
+		public ushort Version { get; set; }
+		public ushort BodyLength { get; set; }
+		public uint MessageId { get; set; }
+
+		public ushort RequestCategory { get; set; }
+		public ushort RequestMethod { get; set; }
+
+		public ushort ResponseCode { get; set; }
+
+		public ushort NotificationType { get; set; }
+		public long NotificationObjectId { get; set; }
+
+		public MemoryStream Header { get; private set; }
+		public MemoryStream Body { get; private set; }
+
+		public Connection Connection { get; set; }
 		public int SendAttempts { get; set; }
 		public int ProcessAttempts { get; set; }
 
-		public Message(Connection connection, byte[] data, int length) {
-			this.SendAttempts = 0;
-			this.ProcessAttempts = 0;
+		public Message() {
+			this.Header = new MemoryStream(new byte[Message.HeaderLength], 0, Message.HeaderLength, true, true);
+			this.Body = new MemoryStream();
+		}
+
+		public Message(Connection connection) : this() {
 			this.Connection = connection;
-			this.Data = new byte[length];
-
-			Array.Copy(data, this.Data, length);
-		}
-	}
-
-	public class MessageHeader {
-		public static int Length { get; } = 24;
-		public static int MaxBodyLength { get; } = 0xFFF;
-
-		public ushort BodyLength { get; set; }
-		public uint Id { get; set; }
-		public ushort Version { get; set; }
-
-		public virtual void Deserialize(BinaryReader reader) {
-			this.BodyLength = reader.ReadUInt16();
-			this.Id = reader.ReadUInt32();
-			this.Version = reader.ReadUInt16();
 		}
 
-		public virtual void Serialize(BinaryWriter writer) {
-			writer.Write(this.BodyLength);
-			writer.Write(this.Id);
-			writer.Write(this.Version);
+		public Message(Connection connection, MemoryStream header) : this() {
+			this.Connection = connection;
+
+			header.CopyTo(this.Header);
 		}
 
-		public static int ExtractBodyLength(byte[] buffer) {
-			return (buffer[1] << 8) | buffer[0];
-		}
-	}
+		public void DeserializeHeader() {
+			using (var reader = new BinaryReader(this.Header)) {
+				this.Version = reader.ReadUInt16();
+				this.BodyLength = reader.ReadUInt16();
+				this.MessageId = reader.ReadUInt32();
+				this.RequestCategory = reader.ReadUInt16();
+				this.RequestMethod = reader.ReadUInt16();
 
-	public class RequestHeader : MessageHeader {
-		public ushort Category { get; set; }
-		public ushort Method { get; set; }
-
-		public override void Deserialize(BinaryReader reader) {
-			base.Deserialize(reader);
-
-			this.Category = reader.ReadUInt16();
-			this.Method = reader.ReadUInt16();
+				this.Body.Capacity = this.BodyLength;
+			}
 		}
 
-		public override void Serialize(BinaryWriter writer) {
-			base.Serialize(writer);
+		public void SerializeHeader() {
+			using (var writer = new BinaryWriter(this.Header)) {
+				writer.Write(this.Version);
+				writer.Write(this.BodyLength);
+				writer.Write(this.MessageId);
 
-			writer.Write(this.Category);
-			writer.Write(this.Method);
-		}
-	}
-
-	public class ResponseHeader : MessageHeader {
-		public ushort ResponseCode { get; set; }
-
-		public override void Deserialize(BinaryReader reader) {
-			base.Deserialize(reader);
-
-			this.ResponseCode = reader.ReadUInt16();
-		}
-
-		public override void Serialize(BinaryWriter writer) {
-			base.Serialize(writer);
-
-			writer.Write(this.ResponseCode);
-		}
-	}
-
-	public class Notification : MessageHeader {
-		public long TargetAuthenticatedId { get; set; }
-
-		public ushort NotificationType { get; set; }
-		public long ObjectId { get; set; }
-
-		public Notification() : this(0, 0, 0) {
-
+				if (this.MessageId != 0) {
+					writer.Write(this.RequestCategory);
+					writer.Write(this.RequestMethod);
+				}
+				else {
+					writer.Write(this.NotificationType);
+					writer.Write(this.NotificationObjectId);
+				}
+			}
 		}
 
-		public Notification(long targetAuthenticatedId, ushort notificationType, long objectId) {
-			this.TargetAuthenticatedId = targetAuthenticatedId;
-			this.NotificationType = notificationType;
-			this.ObjectId = objectId;
-		}
+		public static Message CreateNotification(ushort notificationType, long objectId) {
+			var message = new Message();
 
-		public override void Deserialize(BinaryReader reader) {
-			base.Deserialize(reader);
+			message.Version = 0;
+			message.BodyLength = 0;
+			message.MessageId = 0;
+			message.NotificationType = notificationType;
+			message.NotificationObjectId = objectId;
 
-			this.NotificationType = reader.ReadUInt16();
-			this.ObjectId = reader.ReadInt64();
-		}
-
-		public override void Serialize(BinaryWriter writer) {
-			base.Serialize(writer);
-
-			writer.Write(this.NotificationType);
-			writer.Write(this.ObjectId);
+			return message;
 		}
 	}
 }

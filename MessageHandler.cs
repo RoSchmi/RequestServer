@@ -46,7 +46,7 @@ namespace ArkeIndustries.RequestServer {
 
 		public long AuthenticatedId { get; set; }
 		public ContextType Context { get; set; }
-		public List<Notification> Notifications { get; set; }
+		public List<Tuple<long, Message>> Notifications { get; set; }
 
 		public abstract ushort Category { get; }
 		public abstract ushort Method { get; }
@@ -56,7 +56,7 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		public MessageHandler() {
-			this.Notifications = new List<Notification>();
+			this.Notifications = new List<Tuple<long, Message>>();
 			this.AuthenticatedId = 0;
 			this.Context = default(ContextType);
 		}
@@ -213,11 +213,11 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		protected void SendNotification(long targetAuthenticatedId, ushort notificationType) {
-			this.Notifications.Add(new Notification(targetAuthenticatedId, notificationType, 0));
+			this.Notifications.Add(Tuple.Create(targetAuthenticatedId, Message.CreateNotification(notificationType, 0)));
 		}
 
 		protected void SendNotification(long targetAuthenticatedId, ushort notificationType, long objectId) {
-			this.Notifications.Add(new Notification(targetAuthenticatedId, notificationType, objectId));
+			this.Notifications.Add(Tuple.Create(targetAuthenticatedId, Message.CreateNotification(notificationType, objectId)));
 		}
 	}
 
