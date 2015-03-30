@@ -118,31 +118,29 @@ namespace ArkeIndustries.RequestServer {
 			else if (property.PropertyType == typeof(DateTime)) {
 				property.SetValue(o, MessageHandler<ContextType>.DateTimeEpoch.AddMilliseconds(reader.ReadUInt64()));
 			}
+			else if (property.PropertyType.GetInterfaces().Any(i => i == typeof(IList))) {
+				var itemType = property.PropertyType.GenericTypeArguments[0];
+				var itemConstructor = itemType.GetConstructor(Type.EmptyTypes);
+				var propertyConstructor = property.PropertyType.GetConstructor(Type.EmptyTypes);
+				var collection = (IList)propertyConstructor.Invoke(null);
+
+				var fields = MessageHandler<ContextType>.GetProperties<AttributeType>(itemConstructor.Invoke(null));
+				var count = reader.ReadUInt16();
+
+				for (var i = 0; i < count; i++) {
+					var newObject = itemConstructor.Invoke(null);
+
+					fields.ForEach(f => MessageHandler<ContextType>.Deserialize<AttributeType>(reader, f, newObject));
+
+					collection.Add(newObject);
+				}
+
+				property.SetValue(o, collection);
+			}
 			else {
-				if (property.PropertyType.GetInterfaces().Any(i => i == typeof(IList))) {
-					var itemType = property.PropertyType.GenericTypeArguments[0];
-					var itemConstructor = itemType.GetConstructor(Type.EmptyTypes);
-					var propertyConstructor = property.PropertyType.GetConstructor(Type.EmptyTypes);
-					var collection = (IList)propertyConstructor.Invoke(null);
+				var child = property.GetValue(o);
 
-					var fields = MessageHandler<ContextType>.GetProperties<AttributeType>(itemConstructor.Invoke(null));
-					var count = reader.ReadUInt16();
-
-					for (var i = 0; i < count; i++) {
-						var newObject = itemConstructor.Invoke(null);
-
-						fields.ForEach(f => MessageHandler<ContextType>.Deserialize<AttributeType>(reader, f, newObject));
-
-						collection.Add(newObject);
-					}
-
-					property.SetValue(o, collection);
-				}
-				else {
-					var child = property.GetValue(o);
-
-					MessageHandler<ContextType>.GetProperties<AttributeType>(child).ForEach(f => MessageHandler<ContextType>.Deserialize<AttributeType>(reader, f, child));
-				}
+				MessageHandler<ContextType>.GetProperties<AttributeType>(child).ForEach(f => MessageHandler<ContextType>.Deserialize<AttributeType>(reader, f, child));
 			}
 		}
 
@@ -182,25 +180,23 @@ namespace ArkeIndustries.RequestServer {
 			else if (property.PropertyType == typeof(DateTime)) {
 				writer.Write((ulong)((DateTime)child - MessageHandler<ContextType>.DateTimeEpoch).TotalMilliseconds);
 			}
+			else if (property.PropertyType.GetInterfaces().Any(i => i == typeof(IList))) {
+				var collection = (IList)child;
+
+				writer.Write((ushort)collection.Count);
+
+				if (collection.Count == 0)
+					return;
+
+				var fields = MessageHandler<ContextType>.GetProperties<AttributeType>(collection[0]);
+
+				for (var i = 0; i < collection.Count; i++)
+					fields.ForEach(f => MessageHandler<ContextType>.Serialize<AttributeType>(writer, f, collection[i]));
+
+				collection.Clear();
+			}
 			else {
-				if (property.PropertyType.GetInterfaces().Any(i => i == typeof(IList))) {
-					var collection = (IList)child;
-
-					writer.Write((ushort)collection.Count);
-
-					if (collection.Count == 0)
-						return;
-
-					var fields = MessageHandler<ContextType>.GetProperties<AttributeType>(collection[0]);
-
-					for (var i = 0; i < collection.Count; i++)
-						fields.ForEach(f => MessageHandler<ContextType>.Serialize<AttributeType>(writer, f, collection[i]));
-
-					collection.Clear();
-				}
-				else {
-					MessageHandler<ContextType>.GetProperties<AttributeType>(child).ForEach(f => MessageHandler<ContextType>.Serialize<AttributeType>(writer, f, child));
-				}
+				MessageHandler<ContextType>.GetProperties<AttributeType>(child).ForEach(f => MessageHandler<ContextType>.Serialize<AttributeType>(writer, f, child));
 			}
 		}
 
@@ -216,7 +212,11 @@ namespace ArkeIndustries.RequestServer {
 			return MessageHandler<ContextType>.GetKey(this.Category, this.Method);
 		}
 
-		protected void SendNotification(long targetAuthenticatedId, ushort notificationType, long objectId = 0) {
+		protected void SendNotification(long targetAuthenticatedId, ushort notificationType) {
+			this.Notifications.Add(new Notification(targetAuthenticatedId, notificationType, 0));
+		}
+
+		protected void SendNotification(long targetAuthenticatedId, ushort notificationType, long objectId) {
 			this.Notifications.Add(new Notification(targetAuthenticatedId, notificationType, objectId));
 		}
 	}
@@ -248,7 +248,7 @@ namespace ArkeIndustries.RequestServer {
 			var property = Expression.Property(parameter, this.OrderByField);
 			var sort = Expression.Lambda(property, parameter);
 			var quote = Expression.Quote(sort);
-            var call = Expression.Call(typeof(Queryable), this.OrderByAscending ? "OrderBy" : "OrderByDescending", new[] { typeof(EntryType), property.Type }, query.Expression, quote);
+			var call = Expression.Call(typeof(Queryable), this.OrderByAscending ? "OrderBy" : "OrderByDescending", new[] { typeof(EntryType), property.Type }, query.Expression, quote);
 
 			this.Entries = query.Provider.CreateQuery<EntryType>(call).Skip((int)this.Skip).Take((int)this.Take).ToList();
 		}

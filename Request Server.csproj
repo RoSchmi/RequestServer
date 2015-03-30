@@ -35,6 +35,7 @@
     <Reference Include="System.ComponentModel.DataAnnotations" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Codes.cs" />
     <Compile Include="Connection.cs" />
     <Compile Include="DataAnnotations.cs" />
     <Compile Include="MessageContext.cs" />
