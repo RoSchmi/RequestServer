@@ -48,8 +48,7 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		public void AddSource(MessageSource source) {
-			source.CancellationToken = this.cancellationSource.Token;
-			source.MessageDestination = this.incomingMessages;
+			source.ReceivedMessages = this.incomingMessages;
 
 			this.sources.Add(source);
 		}
@@ -165,7 +164,7 @@ namespace ArkeIndustries.RequestServer {
 						message.ResponseCode = ResponseCode.WrongParameterNumber;
 					}
 					catch (MessageContextSaveFailedException e) {
-						if (e.CanRetry) {
+						if (e.CanRetryMessage) {
 							if (++message.ProcessAttempts <= this.MessageRetryAttempts) {
 								this.incomingMessages.Add(message);
 							}

@@ -1,19 +1,10 @@
 ﻿using System;
 using System.IO;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace ArkeIndustries.RequestServer {
 	public abstract class Connection : IDisposable {
-		protected bool Disposed { get; set; }
-		protected CancellationToken CancellationToken { get; set; }
-
 		public long AuthenticatedId { get; set; }
-
-		public Connection(CancellationToken token) {
-			this.CancellationToken = token;
-			this.Disposed = false;
-		}
 
 		public async Task<bool> Send(Message message) {
 			message.SerializeHeader();
@@ -66,7 +57,7 @@ namespace ArkeIndustries.RequestServer {
 		protected abstract Task<int> Receive(MemoryStream stream, long offset, long length);
 
 		protected virtual void Dispose(bool disposing) {
-			this.Disposed = true;
+
 		}
 
 		public void Dispose() {

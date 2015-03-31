@@ -3,16 +3,16 @@ using System.Threading;
 using System.Threading.Tasks;
 
 namespace ArkeIndustries.RequestServer {
-	public abstract class Updater<ContextType> where ContextType : MessageContext {
+	public abstract class Updater<TContext> where TContext : MessageContext {
 		private Task worker;
-		private Node<ContextType> node;
+		private Node<TContext> node;
 
 		public CancellationToken CancellationToken { get; set; }
 		public TimeSpan Interval { get; set; }
 
-		protected ContextType Context { get { return this.node.Context; } }
+		protected TContext Context { get { return this.node.Context; } }
 
-		public Updater(Node<ContextType> node) {
+		public Updater(Node<TContext> node) {
 			this.node = node;
 		}
 

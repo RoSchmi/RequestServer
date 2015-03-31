@@ -4,7 +4,7 @@ using System.Runtime.Serialization;
 namespace ArkeIndustries.RequestServer {
 	[Serializable]
 	public class MessageContextSaveFailedException : Exception {
-		public bool CanRetry { get; set; }
+		public bool CanRetryMessage { get; set; }
 		public ushort ResponseCode { get; set; }
 
 		public MessageContextSaveFailedException() { }

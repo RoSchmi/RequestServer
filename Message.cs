@@ -1,8 +1,11 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 
 namespace ArkeIndustries.RequestServer {
-	public class Message {
+	public class Message : IDisposable {
 		private static int HeaderLength { get; } = 24;
+
+		private bool disposed = false;
 
 		public ushort Version { get; set; }
 		public ushort BodyLength { get; set; }
@@ -26,6 +29,8 @@ namespace ArkeIndustries.RequestServer {
 		public Message() {
 			this.Header = new MemoryStream(new byte[Message.HeaderLength], 0, Message.HeaderLength, true, true);
 			this.Body = new MemoryStream();
+
+			this.disposed = false;
 		}
 
 		public Message(Connection connection) : this() {
@@ -77,6 +82,24 @@ namespace ArkeIndustries.RequestServer {
 			message.NotificationObjectId = objectId;
 
 			return message;
+		}
+
+		protected virtual void Dispose(bool disposing) {
+			if (!this.disposed) {
+				if (disposing) {
+					this.Header.Dispose();
+					this.Header = null;
+
+					this.Body.Dispose();
+					this.Body = null;
+				}
+
+				this.disposed = true;
+			}
+		}
+
+		public void Dispose() {
+			this.Dispose(true);
 		}
 	}
 }

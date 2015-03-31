@@ -1,21 +1,20 @@
-﻿using System;
-using System.IO;
+﻿using System.IO;
 using System.Net;
 using System.Net.Sockets;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace ArkeIndustries.RequestServer.Sources {
 	public class TcpSource : MessageSource {
 		private TcpListener listener;
+		private IPEndPoint endpoint;
 
 		public TcpSource(IPEndPoint endpoint) {
-			this.listener = new TcpListener(endpoint);
+			this.endpoint = endpoint;
 		}
 
-		public override Connection AcceptConnection() {
+		protected override async Task<Connection> AcceptConnection() {
 			try {
-				return new TcpConnection(this.CancellationToken, this.listener.AcceptTcpClient());
+				return new TcpConnection(await this.listener.AcceptTcpClientAsync());
 			}
 			catch (SocketException e) when (e.SocketErrorCode == SocketError.Interrupted) {
 				return null;
@@ -23,6 +22,7 @@ namespace ArkeIndustries.RequestServer.Sources {
 		}
 
 		public override void Start() {
+			this.listener = new TcpListener(endpoint);
 			this.listener.Start();
 
 			base.Start();
@@ -33,61 +33,44 @@ namespace ArkeIndustries.RequestServer.Sources {
 
 			base.Stop();
 		}
-	}
 
-	public class TcpConnection : Connection {
-		private TcpClient client;
-		private NetworkStream stream;
+		private class TcpConnection : Connection {
+			private TcpClient client;
+			private NetworkStream stream;
+			private bool disposed;
 
-		public TcpConnection(CancellationToken token, TcpClient client) : base(token) {
-			this.client = client;
-			this.stream = client.GetStream();
-		}
+			public TcpConnection(TcpClient client) {
+				this.client = client;
+				this.stream = client.GetStream();
+				this.disposed = false;
+			}
 
-		protected override async Task<bool> Send(MemoryStream stream, long offset, long length) {
-			if (this.Disposed)
-				return true;
-
-			if (!this.stream.CanWrite)
-				return false;
-
-			stream.Seek(offset, SeekOrigin.Begin);
-
-			try {
-				await this.stream.WriteAsync(stream.GetBuffer(), (int)offset, (int)length, this.CancellationToken);
+			protected override async Task<bool> Send(MemoryStream stream, long offset, long length) {
+				await this.stream.WriteAsync(stream.GetBuffer(), (int)offset, (int)length);
 
 				return true;
 			}
-			catch (IOException) {
 
-			}
-			catch (ObjectDisposedException) {
-
+			protected override async Task<int> Receive(MemoryStream stream, long offset, long length) {
+				return await this.stream.ReadAsync(stream.GetBuffer(), (int)offset, (int)length);
 			}
 
-			return false;
-		}
+			protected override void Dispose(bool disposing) {
+				if (this.disposed)
+					return;
 
-		protected override async Task<int> Receive(MemoryStream stream, long offset, long length) {
-			try {
-				return await this.stream.ReadAsync(stream.GetBuffer(), (int)offset, (int)length, this.CancellationToken);
-			}
-			catch (IOException) {
-
-			}
-
-			return 0;
-		}
-
-		protected override void Dispose(bool disposing) {
-			if (!this.Disposed) {
 				if (disposing) {
-					this.stream.Dispose();
 					this.client.Dispose();
-				}
-			}
+					this.client = null;
 
-			base.Dispose(disposing);
+					this.stream.Dispose();
+					this.stream = null;
+				}
+
+				this.disposed = true;
+
+				base.Dispose(disposing);
+			}
 		}
 	}
 }
