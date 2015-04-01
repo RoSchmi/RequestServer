@@ -9,14 +9,6 @@ using System.Reflection;
 using System.Runtime.Serialization;
 
 namespace ArkeIndustries.RequestServer {
-	[Serializable]
-	public class ListQueryValidationFailedException : Exception {
-		public ListQueryValidationFailedException() { }
-		public ListQueryValidationFailedException(string message) : base(message) { }
-		public ListQueryValidationFailedException(string message, Exception inner) : base(message, inner) { }
-		protected ListQueryValidationFailedException(SerializationInfo info, StreamingContext context) : base(info, context) { }
-	}
-
 	public enum MessageParameterDirection {
 		Input,
 		Output

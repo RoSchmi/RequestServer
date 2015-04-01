@@ -3,7 +3,7 @@ using System.IO;
 
 namespace ArkeIndustries.RequestServer {
 	public class Message : IDisposable {
-		private static int HeaderLength { get; } = 24;
+		private static int HeaderLength => 24;
 
 		private bool disposed = false;
 

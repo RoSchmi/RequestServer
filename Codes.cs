@@ -1,19 +1,19 @@
 ﻿namespace ArkeIndustries.RequestServer {
 	public static class ResponseCode {
-		public static ushort Success { get; } = 0;
-		public static ushort NotAuthorized { get; } = 1;
-		public static ushort WrongMethod { get; } = 2;
-		public static ushort WrongParameterNumber { get; } = 3;
-		public static ushort InternalServerError { get; } = 4;
-		public static ushort ParameterValidationFailed { get; } = 5;
-		public static ushort AuthenticationFailed { get; } = 6;
-		public static ushort TryAgainLater { get; } = 7;
-		public static ushort ConcurrencyFailure { get; } = 8;
+		public static ushort Success => 0;
+		public static ushort NotAuthorized => 1;
+		public static ushort WrongMethod => 2;
+		public static ushort WrongParameterNumber => 3;
+		public static ushort InternalServerError => 4;
+		public static ushort ParameterValidationFailed => 5;
+		public static ushort AuthenticationFailed => 6;
+		public static ushort TryAgainLater => 7;
+		public static ushort ConcurrencyFailure => 8;
 	}
 
 	public static class NotificationCode {
-		public static ushort UpdateStarted { get; } = 0;
-		public static ushort UpdateFinished { get; } = 1;
-		public static ushort ServerShuttingDown { get; } = 2;
+		public static ushort UpdateStarted => 0;
+		public static ushort UpdateFinished => 1;
+		public static ushort ServerShuttingDown => 2;
 	}
 }
