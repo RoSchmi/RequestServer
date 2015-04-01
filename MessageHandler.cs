@@ -55,6 +55,7 @@ namespace ArkeIndustries.RequestServer {
 		private List<Tuple<ValidationAttribute, PropertyInfo>> validationProperties;
 
 		public long AuthenticatedId { get; set; }
+		public int AuthenticatedLevel { get; set; }
 		public TContext Context { get; set; }
 		public List<Notification> GeneratedNotifications { get; private set; }
 

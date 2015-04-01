@@ -12,7 +12,7 @@ namespace ArkeIndustries.RequestServer {
 		private BlockingCollection<Message> outgoingMessages;
 		private BlockingCollection<Message> incomingMessages;
 		private BlockingCollection<Notification> notifications;
-		private Dictionary<uint, MessageHandler<ContextType>> handlers;
+		private Dictionary<uint, Tuple<MessageDefinitionAttribute, MessageHandler<ContextType>>> handlers;
 		private List<MessageSource> sources;
 		private CancellationTokenSource cancellationSource;
 		private Task incomingWorker;
@@ -35,7 +35,7 @@ namespace ArkeIndustries.RequestServer {
 			this.outgoingMessages = new BlockingCollection<Message>();
 			this.incomingMessages = new BlockingCollection<Message>();
 			this.notifications = new BlockingCollection<Notification>();
-			this.handlers = new Dictionary<uint, MessageHandler<ContextType>>();
+			this.handlers = new Dictionary<uint, Tuple<MessageDefinitionAttribute, MessageHandler<ContextType>>>();
 			this.sources = new List<MessageSource>();
 			this.incomingWorker = new Task(this.ProcessIncomingMessages, TaskCreationOptions.LongRunning);
 			this.outgoingWorker = new Task(this.ProcessOutgoingMessages, TaskCreationOptions.LongRunning);
@@ -72,7 +72,7 @@ namespace ArkeIndustries.RequestServer {
 
 					handler.Context = this.Context;
 
-					this.handlers.Add(key, handler);
+					this.handlers.Add(key, Tuple.Create(attribute, handler));
 				}
 			}
 		}
@@ -140,58 +140,63 @@ namespace ArkeIndustries.RequestServer {
 				var opposite = this.handlers;
 
 				if (handlers.ContainsKey(key)) {
-					var handler = handlers[key];
+					var attr = handlers[key].Item1;
+					var handler = handlers[key].Item2;
 
-					handler.AuthenticatedId = message.Connection.AuthenticatedId;
+					if (message.Connection.AuthenticatedLevel >= attr.AuthenticationLevelRequired) {
+						handler.AuthenticatedId = message.Connection.AuthenticatedId;
+						handler.AuthenticatedLevel = message.Connection.AuthenticatedLevel;
 
-					handler.Context.BeginMessage();
+						handler.Context.BeginMessage();
 
-					try {
-						handler.Deserialize(MessageParameterDirection.Input, message.Body);
+						try {
+							handler.Deserialize(MessageParameterDirection.Input, message.Body);
 
-						if (handler.IsValid()) {
-							message.ResponseCode = handler.Perform();
+							if (handler.IsValid()) {
+								message.ResponseCode = handler.Perform();
 
-							handler.Context.SaveChanges();
+								handler.Context.SaveChanges();
 
-							message.Connection.AuthenticatedId = handler.AuthenticatedId;
-						}
-						else {
-							message.ResponseCode = ResponseCode.ParameterValidationFailed;
-						}
-
-					}
-					catch (EndOfStreamException) {
-						message.ResponseCode = ResponseCode.WrongParameterNumber;
-					}
-					catch (MessageContextSaveFailedException e) {
-						if (e.CanRetryMessage) {
-							if (++message.ProcessAttempts <= this.MessageRetryAttempts) {
-								this.incomingMessages.Add(message);
+								message.Connection.AuthenticatedId = handler.AuthenticatedId;
+								message.Connection.AuthenticatedLevel = handler.AuthenticatedLevel;
 							}
 							else {
-								message.ResponseCode = ResponseCode.TryAgainLater;
+								message.ResponseCode = ResponseCode.ParameterValidationFailed;
+							}
+
+						}
+						catch (EndOfStreamException) {
+							message.ResponseCode = ResponseCode.WrongParameterNumber;
+						}
+						catch (MessageContextSaveFailedException e) {
+							if (e.CanRetryMessage) {
+								if (++message.ProcessAttempts <= this.MessageRetryAttempts) {
+									this.incomingMessages.Add(message);
+								}
+								else {
+									message.ResponseCode = ResponseCode.TryAgainLater;
+								}
+							}
+							else {
+								message.ResponseCode = e.ResponseCode;
 							}
 						}
-						else {
-							message.ResponseCode = e.ResponseCode;
-						}
+
+						handler.Context.EndMessage();
+
+						if (message.ResponseCode == ResponseCode.Success)
+							handler.Serialize(MessageParameterDirection.Output, responseStream);
+
+						foreach (var n in handler.GeneratedNotifications)
+							this.notifications.Add(n);
+
+						this.SentMessages += handler.GeneratedNotifications.Count;
+
+						handler.GeneratedNotifications.Clear();
 					}
-
-					handler.Context.EndMessage();
-
-					if (message.ResponseCode == ResponseCode.Success)
-						handler.Serialize(MessageParameterDirection.Output, responseStream);
-
-					foreach (var n in handler.GeneratedNotifications)
-						this.notifications.Add(n);
-
-					this.SentMessages += handler.GeneratedNotifications.Count;
-
-					handler.GeneratedNotifications.Clear();
-				}
-				else if (opposite.ContainsKey(key)) {
-					message.ResponseCode = ResponseCode.NotAuthorized;
+					else {
+						message.ResponseCode = ResponseCode.NotAuthorized;
+					}
 				}
 				else {
 					message.ResponseCode = ResponseCode.WrongMethod;

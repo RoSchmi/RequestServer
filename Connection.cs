@@ -4,7 +4,8 @@ using System.Threading.Tasks;
 
 namespace ArkeIndustries.RequestServer {
 	public abstract class Connection : IDisposable {
-		public long AuthenticatedId { get; set; }
+		public long AuthenticatedId { get; set; } = 0;
+		public int AuthenticatedLevel { get; set; } = 0;
 
 		public async Task<bool> Send(Message message) {
 			message.SerializeHeader();
