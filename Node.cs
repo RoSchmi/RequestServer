@@ -11,9 +11,8 @@ namespace ArkeIndustries.RequestServer {
 	public class Node<ContextType> where ContextType : MessageContext {
 		private BlockingCollection<Message> outgoingMessages;
 		private BlockingCollection<Message> incomingMessages;
-		private BlockingCollection<Tuple<long, Message>> notifications;
-		private Dictionary<uint, MessageHandler<ContextType>> authenticatedHandlers;
-		private Dictionary<uint, MessageHandler<ContextType>> unauthenticatedHandlers;
+		private BlockingCollection<Notification> notifications;
+		private Dictionary<uint, MessageHandler<ContextType>> handlers;
 		private List<MessageSource> sources;
 		private CancellationTokenSource cancellationSource;
 		private Task incomingWorker;
@@ -35,9 +34,8 @@ namespace ArkeIndustries.RequestServer {
 		public Node() {
 			this.outgoingMessages = new BlockingCollection<Message>();
 			this.incomingMessages = new BlockingCollection<Message>();
-			this.notifications = new BlockingCollection<Tuple<long, Message>>();
-			this.authenticatedHandlers = new Dictionary<uint, MessageHandler<ContextType>>();
-			this.unauthenticatedHandlers = new Dictionary<uint, MessageHandler<ContextType>>();
+			this.notifications = new BlockingCollection<Notification>();
+			this.handlers = new Dictionary<uint, MessageHandler<ContextType>>();
 			this.sources = new List<MessageSource>();
 			this.incomingWorker = new Task(this.ProcessIncomingMessages, TaskCreationOptions.LongRunning);
 			this.outgoingWorker = new Task(this.ProcessOutgoingMessages, TaskCreationOptions.LongRunning);
@@ -45,6 +43,10 @@ namespace ArkeIndustries.RequestServer {
 			this.cancellationSource = new CancellationTokenSource();
 			this.updateEvent = new AutoResetEvent(false);
 			this.updating = false;
+		}
+
+		private uint GetKey(ushort category, ushort method) {
+			return (uint)((category << 8) | method);
 		}
 
 		public void AddSource(MessageSource source) {
@@ -61,16 +63,16 @@ namespace ArkeIndustries.RequestServer {
 				var matchingClasses = childClasses.Where(c => c.IsDefined(typeof(MessageDefinitionAttribute)) && ((c.GetCustomAttribute<MessageDefinitionAttribute>().ServerId & serverId) != 0));
 
 				foreach (var c in matchingClasses) {
+					var attribute = c.GetCustomAttribute<MessageDefinitionAttribute>();
 					var handler = (MessageHandler<ContextType>)c.GetConstructor(Type.EmptyTypes).Invoke(null);
-					var key = handler.GetKey();
-					var handlers = c.GetCustomAttribute<MessageDefinitionAttribute>().AuthenticationRequired ? this.authenticatedHandlers : this.unauthenticatedHandlers;
+					var key = this.GetKey(attribute.Category, attribute.Method);
 
-					if (handlers.ContainsKey(key))
+					if (this.handlers.ContainsKey(key))
 						throw new InvalidOperationException("This method is already defined.");
 
 					handler.Context = this.Context;
 
-					handlers.Add(key, handler);
+					this.handlers.Add(key, handler);
 				}
 			}
 		}
@@ -118,7 +120,7 @@ namespace ArkeIndustries.RequestServer {
 
 		private void ProcessIncomingMessages() {
 			Message message;
-			BinaryWriter responseWriter = new BinaryWriter(new MemoryStream());
+			MemoryStream responseStream = new MemoryStream();
 
 			while (!this.cancellationSource.IsCancellationRequested) {
 				if (this.updating)
@@ -133,9 +135,9 @@ namespace ArkeIndustries.RequestServer {
 
 				this.ReceivedMessages++;
 
-				var key = MessageHandler<ContextType>.GetKey(message.RequestCategory, message.RequestMethod);
-				var handlers = message.Connection.AuthenticatedId != 0 ? this.authenticatedHandlers : this.unauthenticatedHandlers;
-				var opposite = message.Connection.AuthenticatedId != 0 ? this.unauthenticatedHandlers : this.authenticatedHandlers;
+				var key = this.GetKey(message.RequestCategory, message.RequestMethod);
+				var handlers = this.handlers;
+				var opposite = this.handlers;
 
 				if (handlers.ContainsKey(key)) {
 					var handler = handlers[key];
@@ -145,8 +147,7 @@ namespace ArkeIndustries.RequestServer {
 					handler.Context.BeginMessage();
 
 					try {
-						using (var reader = new BinaryReader(message.Body))
-							handler.Deserialize<MessageInputAttribute>(reader);
+						handler.Deserialize(MessageParameterDirection.Input, message.Body);
 
 						if (handler.IsValid()) {
 							message.ResponseCode = handler.Perform();
@@ -180,14 +181,14 @@ namespace ArkeIndustries.RequestServer {
 					handler.Context.EndMessage();
 
 					if (message.ResponseCode == ResponseCode.Success)
-						handler.Serialize<MessageOutputAttribute>(responseWriter);
+						handler.Serialize(MessageParameterDirection.Output, responseStream);
 
-					foreach (var n in handler.Notifications)
+					foreach (var n in handler.GeneratedNotifications)
 						this.notifications.Add(n);
 
-					this.SentMessages += handler.Notifications.Count;
+					this.SentMessages += handler.GeneratedNotifications.Count;
 
-					handler.Notifications.Clear();
+					handler.GeneratedNotifications.Clear();
 				}
 				else if (opposite.ContainsKey(key)) {
 					message.ResponseCode = ResponseCode.NotAuthorized;
@@ -196,8 +197,9 @@ namespace ArkeIndustries.RequestServer {
 					message.ResponseCode = ResponseCode.WrongMethod;
 				}
 
-				message.BodyLength = (ushort)(responseWriter.BaseStream.Position);
-				responseWriter.BaseStream.CopyTo(message.Body);
+				message.BodyLength = (ushort)(responseStream.Position);
+				responseStream.CopyTo(message.Body);
+				responseStream.Seek(0, SeekOrigin.Begin);
 
 				this.outgoingMessages.Add(message);
 				this.SentMessages++;
@@ -233,7 +235,7 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		private void ProcessNotifications() {
-			Tuple<long, Message> notification;
+			Notification notification;
 
 			while (!this.cancellationSource.IsCancellationRequested) {
 				try {
@@ -243,8 +245,8 @@ namespace ArkeIndustries.RequestServer {
 					break;
 				}
 
-				foreach (var c in this.FindConnectionsForAuthenticatedId(notification.Item1))
-					this.outgoingMessages.Add(new Message(c, notification.Item2.Header));
+				foreach (var c in this.FindConnectionsForAuthenticatedId(notification.TargetAuthenticatedId))
+					this.outgoingMessages.Add(new Message(c, notification.Message.Header));
 			}
 		}
 

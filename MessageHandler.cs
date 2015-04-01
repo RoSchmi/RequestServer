@@ -17,73 +17,105 @@ namespace ArkeIndustries.RequestServer {
 		protected ListQueryValidationFailedException(SerializationInfo info, StreamingContext context) : base(info, context) { }
 	}
 
+	public enum MessageParameterDirection {
+		Input,
+		Output
+	}
+
 	[AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
 	public class MessageDefinitionAttribute : Attribute {
+		public ushort Category { get; set; }
+		public ushort Method { get; set; }
 		public int ServerId { get; set; }
-		public bool AuthenticationRequired { get; set; }
+		public int AuthenticationLevelRequired { get; set; }
 	}
 
-	[AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
+	[AttributeUsage(AttributeTargets.Property)]
 	public class MessageParameterAttribute : Attribute {
 		public int Index { get; set; }
+		public MessageParameterDirection Direction { get; set; }
 	}
 
-	[AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
+	[AttributeUsage(AttributeTargets.Property)]
 	public class MessageInputAttribute : MessageParameterAttribute {
 
 	}
 
-	[AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
+	[AttributeUsage(AttributeTargets.Property)]
 	public class MessageOutputAttribute : MessageParameterAttribute {
 
 	}
 
-	public abstract class MessageHandler<ContextType> {
-		public static DateTime DateTimeEpoch = new DateTime(2015, 1, 1, 0, 0, 0);
+	public abstract class MessageHandler<TContext> {
+		public static DateTime DateTimeEpoch { get; set; } = new DateTime(2015, 1, 1, 0, 0, 0);
 
-		public bool AuthenticationRequired { get; set; }
+		private List<PropertyInfo> inputProperties;
+		private List<PropertyInfo> outputProperties;
+		private List<Tuple<PropertyInfo, PropertyInfo>> bindProperties;
+		private List<Tuple<ValidationAttribute, PropertyInfo>> validationProperties;
 
 		public long AuthenticatedId { get; set; }
-		public ContextType Context { get; set; }
-		public List<Tuple<long, Message>> Notifications { get; set; }
-
-		public abstract ushort Category { get; }
-		public abstract ushort Method { get; }
+		public TContext Context { get; set; }
+		public List<Notification> GeneratedNotifications { get; private set; }
 
 		public virtual ushort Perform() {
 			return ResponseCode.Success;
 		}
 
 		public MessageHandler() {
-			this.Notifications = new List<Tuple<long, Message>>();
 			this.AuthenticatedId = 0;
-			this.Context = default(ContextType);
+			this.Context = default(TContext);
+			this.GeneratedNotifications = new List<Notification>();
+
+			this.inputProperties = this.GetProperties(this.GetType(), MessageParameterDirection.Input);
+			this.outputProperties = this.GetProperties(this.GetType(), MessageParameterDirection.Output);
+			this.validationProperties = this.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(p => p.IsDefined(typeof(ValidationAttribute))).Select(p => Tuple.Create(p.GetCustomAttribute<ValidationAttribute>(), p)).ToList();
 		}
 
-		protected void BindResponseObject(object o) {
-			var objectProperties = o.GetType().GetProperties();
+		private List<PropertyInfo> GetProperties(Type type, MessageParameterDirection direction) {
+			return type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+				.Where(p => p.IsDefined(typeof(MessageParameterAttribute)) && p.GetCustomAttribute<MessageParameterAttribute>().Direction == direction)
+				.OrderBy(p => p.GetCustomAttribute<MessageParameterAttribute>().Index)
+				.ToList();
+		}
 
-			foreach (var p in MessageHandler<ContextType>.GetProperties<MessageOutputAttribute>(this)) {
-				var objectProperty = objectProperties.SingleOrDefault(op => op.Name == p.Name);
+		public void Deserialize(MessageParameterDirection direction, MemoryStream stream) {
+			using (var reader = new BinaryReader(stream)) {
+				var properties = direction == MessageParameterDirection.Input ? this.inputProperties : this.outputProperties;
 
-				if (objectProperty != null)
-					p.SetValue(this, Convert.ChangeType(objectProperty.GetValue(o), objectProperty.PropertyType));
+				foreach (var property in properties)
+					this.Deserialize(direction, reader, property, this);
 			}
 		}
 
-		private static List<PropertyInfo> GetProperties<AttributeType>(object o) where AttributeType : MessageParameterAttribute {
-			return o.GetType().GetProperties(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance).Where(p => p.IsDefined(typeof(AttributeType))).OrderBy(p => p.GetCustomAttribute<AttributeType>().Index).ToList();
+		public void Serialize(MessageParameterDirection direction, MemoryStream stream) {
+			using (var writer = new BinaryWriter(stream)) {
+				var properties = direction == MessageParameterDirection.Input ? this.inputProperties : this.outputProperties;
+
+				foreach (var property in properties)
+					this.Serialize(direction, writer, property, this);
+			}
 		}
 
-		public void Deserialize<AttributeType>(BinaryReader reader) where AttributeType : MessageParameterAttribute {
-			MessageHandler<ContextType>.GetProperties<AttributeType>(this).ForEach(f => MessageHandler<ContextType>.Deserialize<AttributeType>(reader, f, this));
+		protected void BindResponseObject(object obj) {
+			if (this.bindProperties == null) {
+				this.bindProperties = new List<Tuple<PropertyInfo, PropertyInfo>>();
+
+				var boundProperties = obj.GetType().GetProperties();
+
+				foreach (var property in this.outputProperties) {
+					var bound = boundProperties.SingleOrDefault(b => b.Name == property.Name);
+
+					if (bound != null)
+						this.bindProperties.Add(Tuple.Create(property, bound));
+				}
+			}
+
+			foreach (var p in this.bindProperties)
+				p.Item1.SetValue(this, Convert.ChangeType(p.Item2.GetValue(obj), p.Item2.PropertyType));
 		}
 
-		public void Serialize<AttributeType>(BinaryWriter writer) where AttributeType : MessageParameterAttribute {
-			MessageHandler<ContextType>.GetProperties<AttributeType>(this).ForEach(f => MessageHandler<ContextType>.Serialize<AttributeType>(writer, f, this));
-		}
-
-		private static void Deserialize<AttributeType>(BinaryReader reader, PropertyInfo property, object o) where AttributeType : MessageParameterAttribute {
+		private void Deserialize(MessageParameterDirection direction, BinaryReader reader, PropertyInfo property, object o) {
 			if (property.PropertyType == typeof(string)) {
 				property.SetValue(o, reader.ReadString());
 			}
@@ -115,7 +147,7 @@ namespace ArkeIndustries.RequestServer {
 				property.SetValue(o, reader.ReadInt64());
 			}
 			else if (property.PropertyType == typeof(DateTime)) {
-				property.SetValue(o, MessageHandler<ContextType>.DateTimeEpoch.AddMilliseconds(reader.ReadUInt64()));
+				property.SetValue(o, MessageHandler<TContext>.DateTimeEpoch.AddMilliseconds(reader.ReadUInt64()));
 			}
 			else if (property.PropertyType.GetInterfaces().Any(i => i == typeof(IList))) {
 				var itemType = property.PropertyType.GenericTypeArguments[0];
@@ -123,13 +155,13 @@ namespace ArkeIndustries.RequestServer {
 				var propertyConstructor = property.PropertyType.GetConstructor(Type.EmptyTypes);
 				var collection = (IList)propertyConstructor.Invoke(null);
 
-				var fields = MessageHandler<ContextType>.GetProperties<AttributeType>(itemConstructor.Invoke(null));
+				var fields = this.GetProperties(itemType, direction);
 				var count = reader.ReadUInt16();
 
 				for (var i = 0; i < count; i++) {
 					var newObject = itemConstructor.Invoke(null);
 
-					fields.ForEach(f => MessageHandler<ContextType>.Deserialize<AttributeType>(reader, f, newObject));
+					fields.ForEach(f => this.Deserialize(direction, reader, f, newObject));
 
 					collection.Add(newObject);
 				}
@@ -139,11 +171,11 @@ namespace ArkeIndustries.RequestServer {
 			else {
 				var child = property.GetValue(o);
 
-				MessageHandler<ContextType>.GetProperties<AttributeType>(child).ForEach(f => MessageHandler<ContextType>.Deserialize<AttributeType>(reader, f, child));
+				this.GetProperties(property.PropertyType, direction).ForEach(f => this.Deserialize(direction, reader, f, child));
 			}
 		}
 
-		private static void Serialize<AttributeType>(BinaryWriter writer, PropertyInfo property, object o) where AttributeType : MessageParameterAttribute {
+		private void Serialize(MessageParameterDirection direction, BinaryWriter writer, PropertyInfo property, object o) {
 			var child = property.GetValue(o);
 
 			if (property.PropertyType == typeof(string)) {
@@ -177,7 +209,7 @@ namespace ArkeIndustries.RequestServer {
 				writer.Write((long)child);
 			}
 			else if (property.PropertyType == typeof(DateTime)) {
-				writer.Write((ulong)((DateTime)child - MessageHandler<ContextType>.DateTimeEpoch).TotalMilliseconds);
+				writer.Write((ulong)((DateTime)child - MessageHandler<TContext>.DateTimeEpoch).TotalMilliseconds);
 			}
 			else if (property.PropertyType.GetInterfaces().Any(i => i == typeof(IList))) {
 				var collection = (IList)child;
@@ -187,40 +219,32 @@ namespace ArkeIndustries.RequestServer {
 				if (collection.Count == 0)
 					return;
 
-				var fields = MessageHandler<ContextType>.GetProperties<AttributeType>(collection[0]);
+				var fields = this.GetProperties(property.PropertyType.GenericTypeArguments[0], direction);
 
 				for (var i = 0; i < collection.Count; i++)
-					fields.ForEach(f => MessageHandler<ContextType>.Serialize<AttributeType>(writer, f, collection[i]));
+					fields.ForEach(f => this.Serialize(direction, writer, f, collection[i]));
 
 				collection.Clear();
 			}
 			else {
-				MessageHandler<ContextType>.GetProperties<AttributeType>(child).ForEach(f => MessageHandler<ContextType>.Serialize<AttributeType>(writer, f, child));
+				this.GetProperties(property.PropertyType, direction).ForEach(f => this.Serialize(direction, writer, f, child));
 			}
 		}
 
 		public virtual bool IsValid() {
-			return !this.GetType().GetProperties(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance).Where(p => p.IsDefined(typeof(ValidationAttribute))).Any(f => f.GetCustomAttributes<ValidationAttribute>().Any(a => !a.IsValid(f.GetValue(this))));
-		}
-
-		public static uint GetKey(ushort category, ushort method) {
-			return (uint)((category << 16) | method);
-		}
-
-		public uint GetKey() {
-			return MessageHandler<ContextType>.GetKey(this.Category, this.Method);
+			return !this.validationProperties.Any(v => !v.Item1.IsValid(v.Item2.GetValue(this)));
 		}
 
 		protected void SendNotification(long targetAuthenticatedId, ushort notificationType) {
-			this.Notifications.Add(Tuple.Create(targetAuthenticatedId, Message.CreateNotification(notificationType, 0)));
+			this.SendNotification(targetAuthenticatedId, notificationType, 0);
 		}
 
 		protected void SendNotification(long targetAuthenticatedId, ushort notificationType, long objectId) {
-			this.Notifications.Add(Tuple.Create(targetAuthenticatedId, Message.CreateNotification(notificationType, objectId)));
+			this.GeneratedNotifications.Add(new Notification(targetAuthenticatedId, notificationType, objectId));
 		}
 	}
 
-	public abstract class ListQueryMessageHandler<ContextType, EntryType> : MessageHandler<ContextType> {
+	public abstract class ListMessageHandler<TContext, TEntry> : MessageHandler<TContext> {
 		public const int InputStartIndex = 4;
 		public const int OutputStartIndex = 1;
 
@@ -240,16 +264,16 @@ namespace ArkeIndustries.RequestServer {
 		public bool OrderByAscending { get; set; }
 
 		[MessageOutput(Index = 0)]
-		public List<EntryType> Entries { get; set; }
+		public List<TEntry> Entries { get; set; }
 
-		protected void OrderTakeAndSet(IQueryable<EntryType> query) {
-			var parameter = Expression.Parameter(typeof(EntryType));
+		protected void OrderTakeAndSet(IQueryable<TEntry> query) {
+			var parameter = Expression.Parameter(typeof(TEntry));
 			var property = Expression.Property(parameter, this.OrderByField);
 			var sort = Expression.Lambda(property, parameter);
 			var quote = Expression.Quote(sort);
-			var call = Expression.Call(typeof(Queryable), this.OrderByAscending ? "OrderBy" : "OrderByDescending", new[] { typeof(EntryType), property.Type }, query.Expression, quote);
+			var call = Expression.Call(typeof(Queryable), this.OrderByAscending ? "OrderBy" : "OrderByDescending", new[] { typeof(TEntry), property.Type }, query.Expression, quote);
 
-			this.Entries = query.Provider.CreateQuery<EntryType>(call).Skip((int)this.Skip).Take((int)this.Take).ToList();
+			this.Entries = query.Provider.CreateQuery<TEntry>(call).Skip((int)this.Skip).Take((int)this.Take).ToList();
 		}
 	}
 }
