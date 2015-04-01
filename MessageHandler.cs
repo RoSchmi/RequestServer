@@ -16,15 +16,14 @@ namespace ArkeIndustries.RequestServer {
 
 	[AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
 	public class MessageDefinitionAttribute : Attribute {
-		public ushort Category { get; set; }
-		public ushort Method { get; set; }
-		public int ServerId { get; set; }
-		public int AuthenticationLevelRequired { get; set; }
+		public long Id { get; set; }
+		public long ServerId { get; set; }
+		public long AuthenticationLevelRequired { get; set; }
 	}
 
 	[AttributeUsage(AttributeTargets.Property)]
 	public class MessageParameterAttribute : Attribute {
-		public int Index { get; set; }
+		public long Index { get; set; }
 		public MessageParameterDirection Direction { get; set; }
 	}
 
@@ -67,16 +66,17 @@ namespace ArkeIndustries.RequestServer {
 		private Dictionary<Type, ISerializationDefinition> serializationDefinitions;
 
 		public long AuthenticatedId { get; set; }
-		public int AuthenticatedLevel { get; set; }
+		public long AuthenticatedLevel { get; set; }
 		public TContext Context { get; set; }
-		public List<Notification> GeneratedNotifications { get; private set; }
+
+		internal List<Notification> GeneratedNotifications { get; private set; }
 
 		public virtual bool Valid => this.validationProperties.All(p => p.Attributes.All(a => a.IsValid(p.Property.GetValue(this))));
 
-		public virtual ushort Perform() => ResponseCode.Success;
+		public virtual long Perform() => ResponseCode.Success;
 		protected void BindResponse(object obj) => this.BindObject(obj, MessageParameterDirection.Output);
-		protected void SendNotification(long targetAuthenticatedId, ushort notificationType) => this.SendNotification(targetAuthenticatedId, notificationType, 0);
-		protected void SendNotification(long targetAuthenticatedId, ushort notificationType, long objectId) => this.GeneratedNotifications.Add(new Notification(targetAuthenticatedId, notificationType, objectId));
+		protected void SendNotification(long targetAuthenticatedId, long notificationType) => this.SendNotification(targetAuthenticatedId, notificationType, 0);
+		protected void SendNotification(long targetAuthenticatedId, long notificationType, long objectId) => this.GeneratedNotifications.Add(new Notification(targetAuthenticatedId, notificationType, objectId));
 
 		private void AddSerializationDefinition<T>(Action<BinaryWriter, ParameterNode, T> serializer, Func<BinaryReader, ParameterNode, T> deserializer) => this.serializationDefinitions.Add(typeof(T), new SerializationDefinition<T> { Serializer = serializer, Deserializer = deserializer });
 
@@ -225,8 +225,8 @@ namespace ArkeIndustries.RequestServer {
 	}
 
 	public abstract class ListMessageHandler<TContext, TEntry> : MessageHandler<TContext> {
-		public static int InputStartIndex => 4;
-		public static int OutputStartIndex => 1;
+		public static long InputStartIndex => 4;
+		public static long OutputStartIndex => 1;
 
 		[MessageParameter(Direction = MessageParameterDirection.Input, Index = 0)]
 		[DataAnnotations.AtLeast(0)]

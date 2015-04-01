@@ -51,7 +51,7 @@ namespace ArkeIndustries.RequestServer.Sources {
 				return true;
 			}
 
-			protected override async Task<int> Receive(MemoryStream stream, long offset, long length) {
+			protected override async Task<long> Receive(MemoryStream stream, long offset, long length) {
 				return await this.stream.ReadAsync(stream.GetBuffer(), (int)offset, (int)length);
 			}
 

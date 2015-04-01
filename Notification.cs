@@ -1,11 +1,13 @@
 ﻿namespace ArkeIndustries.RequestServer {
-	public class Notification {
-		public Message Message { get; set; }
+	internal class Notification {
 		public long TargetAuthenticatedId { get; set; }
+		public long NotificationType { get; set; }
+		public long ObjectId { get; set; }
 
-		public Notification(long targetAuthenticatedId, ushort notificationType, long objectId) {
-			this.Message = Message.CreateNotification(notificationType, objectId);
+		public Notification(long targetAuthenticatedId, long notificationType, long objectId) {
 			this.TargetAuthenticatedId = targetAuthenticatedId;
+			this.NotificationType = notificationType;
+			this.ObjectId = objectId;
 		}
 	}
 }
