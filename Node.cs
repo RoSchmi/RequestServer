@@ -152,7 +152,7 @@ namespace ArkeIndustries.RequestServer {
 						try {
 							handler.Deserialize(MessageParameterDirection.Input, message.Body);
 
-							if (handler.IsValid()) {
+							if (handler.Valid) {
 								message.ResponseCode = handler.Perform();
 
 								handler.Context.SaveChanges();

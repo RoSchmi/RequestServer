@@ -37,27 +37,56 @@ namespace ArkeIndustries.RequestServer {
 	}
 
 	public abstract class MessageHandler<TContext> {
-		private class Node {
+		private class ParameterNode {
 			public PropertyInfo Property { get; set; }
 			public Type ListType { get; set; }
-			public List<Node> Children { get; set; }
+			public List<ParameterNode> Children { get; set; }
+		}
+
+		private class BoundProperty {
+			public PropertyInfo Property { get; set; }
+			public ParameterNode Parameter { get; set; }
+		}
+
+		private class ValidationProperty {
+			public List<ValidationAttribute> Attributes { get; set; }
+			public PropertyInfo Property { get; set; }
+		}
+
+		private interface ISerializationDefinition {
+			void Serialize(BinaryWriter writer, ParameterNode node, object obj);
+			object Deserialize(BinaryReader reader, ParameterNode node);
+		}
+
+		private class SerializationDefinition<T> : ISerializationDefinition {
+			public Action<BinaryWriter, ParameterNode, T> Serializer { get; set; }
+			public Func<BinaryReader, ParameterNode, T> Deserializer { get; set; }
+
+			public void Serialize(BinaryWriter writer, ParameterNode node, object obj) => this.Serializer(writer, node, (T)obj);
+			public object Deserialize(BinaryReader reader, ParameterNode node) => this.Deserializer(reader, node);
 		}
 
 		public static DateTime DateTimeEpoch { get; set; } = new DateTime(2015, 1, 1, 0, 0, 0);
 
-		private List<Node> inputProperties;
-		private List<Node> outputProperties;
-		private List<Tuple<Node, PropertyInfo>> bindProperties;
-		private List<Tuple<ValidationAttribute, PropertyInfo>> validationProperties;
+		private List<ParameterNode> inputProperties;
+		private List<ParameterNode> outputProperties;
+		private List<BoundProperty> boundProperties;
+		private List<ValidationProperty> validationProperties;
+		private Dictionary<Type, ISerializationDefinition> serializationDefinitions;
 
 		public long AuthenticatedId { get; set; }
 		public int AuthenticatedLevel { get; set; }
 		public TContext Context { get; set; }
 		public List<Notification> GeneratedNotifications { get; private set; }
 
-		public virtual ushort Perform() {
-			return ResponseCode.Success;
-		}
+		public virtual bool Valid => this.validationProperties.All(p => p.Attributes.All(a => a.IsValid(p.Property.GetValue(this))));
+
+		public virtual ushort Perform() => ResponseCode.Success;
+		protected void BindResponse(object obj) => this.BindObject(obj, MessageParameterDirection.Output);
+		protected void SendNotification(long targetAuthenticatedId, ushort notificationType) => this.SendNotification(targetAuthenticatedId, notificationType, 0);
+		protected void SendNotification(long targetAuthenticatedId, ushort notificationType, long objectId) => this.GeneratedNotifications.Add(new Notification(targetAuthenticatedId, notificationType, objectId));
+
+		private void AddSerializationDefinition<T>(Action<BinaryWriter, ParameterNode, T> serializer, Func<BinaryReader, ParameterNode, T> deserializer) => this.serializationDefinitions.Add(typeof(T), new SerializationDefinition<T> { Serializer = serializer, Deserializer = deserializer });
 
 		public MessageHandler() {
 			this.AuthenticatedId = 0;
@@ -66,20 +95,24 @@ namespace ArkeIndustries.RequestServer {
 
 			this.inputProperties = this.CreateTree(MessageParameterDirection.Input);
 			this.outputProperties = this.CreateTree(MessageParameterDirection.Output);
-			this.validationProperties = this.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(p => p.IsDefined(typeof(ValidationAttribute))).Select(p => Tuple.Create(p.GetCustomAttribute<ValidationAttribute>(), p)).ToList();
-		}
 
-		private List<PropertyInfo> GetProperties(Type type, MessageParameterDirection direction) {
-			return type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-				.Where(p => p.IsDefined(typeof(MessageParameterAttribute)) && p.GetCustomAttribute<MessageParameterAttribute>().Direction == direction)
-				.OrderBy(p => p.GetCustomAttribute<MessageParameterAttribute>().Index)
+			this.validationProperties = this.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance)
+				.Where(p => p.IsDefined(typeof(ValidationAttribute)))
+				.Select(p => new ValidationProperty() { Property = p, Attributes = p.GetCustomAttributes<ValidationAttribute>().ToList() })
 				.ToList();
-		}
 
-		public void Deserialize(MessageParameterDirection direction, MemoryStream stream) {
-			using (var reader = new BinaryReader(stream))
-				foreach (var property in direction == MessageParameterDirection.Input ? this.inputProperties : this.outputProperties)
-					this.Deserialize(reader, property, this);
+			this.serializationDefinitions = new Dictionary<Type, ISerializationDefinition>();
+			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadString());
+			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadBoolean());
+			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadByte());
+			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadSByte());
+			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadUInt16());
+			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadInt16());
+			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadUInt32());
+			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadInt32());
+			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadUInt64());
+			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadInt64());
+			this.AddSerializationDefinition((r, p, o) => r.Write((ulong)((o - MessageHandler<TContext>.DateTimeEpoch).TotalMilliseconds)), (w, p) => MessageHandler<TContext>.DateTimeEpoch.AddMilliseconds(w.ReadUInt64()));
 		}
 
 		public void Serialize(MessageParameterDirection direction, MemoryStream stream) {
@@ -88,38 +121,49 @@ namespace ArkeIndustries.RequestServer {
 					this.Serialize(writer, property, this);
 		}
 
-		protected void BindResponseObject(object obj) {
-			if (this.bindProperties == null) {
-				this.bindProperties = new List<Tuple<Node, PropertyInfo>>();
-
-				var boundProperties = obj.GetType().GetProperties();
-
-				foreach (var property in this.outputProperties) {
-					var bound = boundProperties.SingleOrDefault(b => property.ListType == null && b.Name == property.Property.Name);
-
-					if (bound != null)
-						this.bindProperties.Add(Tuple.Create(property, bound));
-				}
-			}
-
-			foreach (var p in this.bindProperties)
-				p.Item1.Property.SetValue(this, Convert.ChangeType(p.Item2.GetValue(obj), p.Item2.PropertyType));
+		public void Deserialize(MessageParameterDirection direction, MemoryStream stream) {
+			using (var reader = new BinaryReader(stream))
+				foreach (var property in direction == MessageParameterDirection.Input ? this.inputProperties : this.outputProperties)
+					this.Deserialize(reader, property, this);
 		}
 
-		private List<Node> CreateTree(MessageParameterDirection direction) {
+		protected void BindObject(object obj, MessageParameterDirection direction) {
+			if (this.boundProperties == null) {
+				var sourceProperties = obj.GetType().GetProperties();
+				var targetProperties = direction == MessageParameterDirection.Input ? this.inputProperties : this.outputProperties;
+
+				this.boundProperties = targetProperties
+					.Where(p => sourceProperties.Any(s => s.Name == p.Property.Name))
+					.Select(p => new BoundProperty() { Parameter = p, Property = sourceProperties.SingleOrDefault(b => b.Name == p.Property.Name) })
+					.ToList();
+			}
+
+			foreach (var p in this.boundProperties)
+				p.Parameter.Property.SetValue(this, Convert.ChangeType(p.Property.GetValue(obj), p.Property.PropertyType));
+		}
+
+		private List<PropertyInfo> GetProperties(Type type, MessageParameterDirection direction) {
+			return type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+				.Where(p => p.IsDefined(typeof(MessageParameterAttribute)))
+				.Where(p => p.GetCustomAttribute<MessageParameterAttribute>().Direction == direction)
+				.OrderBy(p => p.GetCustomAttribute<MessageParameterAttribute>().Index)
+				.ToList();
+		}
+
+		private List<ParameterNode> CreateTree(MessageParameterDirection direction) {
 			return this.GetProperties(this.GetType(), direction).Select(p => this.CreateTree(direction, p)).ToList();
 		}
 
-		private Node CreateTree(MessageParameterDirection direction, PropertyInfo property) {
-			var node = new Node();
+		private ParameterNode CreateTree(MessageParameterDirection direction, PropertyInfo property) {
+			var node = new ParameterNode();
 
-			if (!property.PropertyType.GetInterfaces().Any(i => i == typeof(IList))) {
+			if (!property.PropertyType.GetInterfaces().Any(i => i == typeof(IList<>))) {
 				node.ListType = null;
 				node.Property = property;
 				node.Children = this.GetProperties(property.PropertyType, direction).Select(p => this.CreateTree(direction, p)).ToList();
 			}
 			else {
-				node.ListType = property.PropertyType.GenericTypeArguments[0];
+				node.ListType = property.PropertyType.GenericTypeArguments.Single();
 				node.Property = property;
 				node.Children = this.GetProperties(node.ListType, direction).Select(p => this.CreateTree(direction, p)).ToList();
 			}
@@ -127,160 +171,97 @@ namespace ArkeIndustries.RequestServer {
 			return node;
 		}
 
-		private void Deserialize(BinaryReader reader, Node node, object obj) {
-			if (node.ListType != null) {
-				var constructor = node.ListType.GetConstructor(Type.EmptyTypes);
-				var propertyConstructor = node.Property.PropertyType.GetConstructor(Type.EmptyTypes);
-				var collection = (IList)propertyConstructor.Invoke(null);
+		private void Serialize(BinaryWriter writer, ParameterNode node, object obj) {
+			ISerializationDefinition def;
 
-				var fields = node.Children;
-				var count = reader.ReadUInt16();
+			if (this.serializationDefinitions.TryGetValue(node.Property.PropertyType, out def)) {
+				def.Serialize(writer, node, obj);
+			}
+			else if (node.ListType != null) {
+				this.SerializeList(writer, node, obj);
+			}
+			else {
+				node.Children.ForEach(f => this.Serialize(writer, f, node.Property.GetValue(obj)));
+			}
+		}
 
-				for (var i = 0; i < count; i++) {
-					var newObject = constructor.Invoke(null);
-
-					fields.ForEach(f => this.Deserialize(reader, f, newObject));
-
-					collection.Add(newObject);
-				}
-
-				node.Property.SetValue(obj, collection);
+		private void Deserialize(BinaryReader reader, ParameterNode node, object obj) {
+			ISerializationDefinition def;
+				
+			if (this.serializationDefinitions.TryGetValue(node.Property.PropertyType, out def)) {
+				node.Property.SetValue(obj, def.Deserialize(reader, node));
 			}
-			else if (node.Property.PropertyType == typeof(string)) {
-				node.Property.SetValue(obj, reader.ReadString());
-			}
-			else if (node.Property.PropertyType == typeof(bool)) {
-				node.Property.SetValue(obj, reader.ReadBoolean());
-			}
-			else if (node.Property.PropertyType == typeof(byte)) {
-				node.Property.SetValue(obj, reader.ReadByte());
-			}
-			else if (node.Property.PropertyType == typeof(sbyte)) {
-				node.Property.SetValue(obj, reader.ReadSByte());
-			}
-			else if (node.Property.PropertyType == typeof(ushort)) {
-				node.Property.SetValue(obj, reader.ReadUInt16());
-			}
-			else if (node.Property.PropertyType == typeof(short)) {
-				node.Property.SetValue(obj, reader.ReadInt16());
-			}
-			else if (node.Property.PropertyType == typeof(uint)) {
-				node.Property.SetValue(obj, reader.ReadUInt32());
-			}
-			else if (node.Property.PropertyType == typeof(int)) {
-				node.Property.SetValue(obj, reader.ReadInt32());
-			}
-			else if (node.Property.PropertyType == typeof(ulong)) {
-				node.Property.SetValue(obj, reader.ReadUInt64());
-			}
-			else if (node.Property.PropertyType == typeof(long)) {
-				node.Property.SetValue(obj, reader.ReadInt64());
-			}
-			else if (node.Property.PropertyType == typeof(DateTime)) {
-				node.Property.SetValue(obj, MessageHandler<TContext>.DateTimeEpoch.AddMilliseconds(reader.ReadUInt64()));
+			else if (node.ListType != null) {
+				node.Property.SetValue(obj, this.DeserializeList(reader, node));
 			}
 			else {
 				node.Children.ForEach(f => this.Deserialize(reader, f, node.Property.GetValue(obj)));
 			}
 		}
 
-		private void Serialize(BinaryWriter writer, Node node, object obj) {
+		private void SerializeList(BinaryWriter writer, ParameterNode node, object obj) {
 			var child = node.Property.GetValue(obj);
+			var collection = (IList)child;
 
-			if (node.ListType != null) {
-				var collection = (IList)child;
+			writer.Write((ushort)collection.Count);
 
-				writer.Write((ushort)collection.Count);
+			if (collection.Count == 0)
+				return;
 
-				if (collection.Count == 0)
-					return;
+			for (var i = 0; i < collection.Count; i++)
+				node.Children.ForEach(f => this.Serialize(writer, f, collection[i]));
 
-				for (var i = 0; i < collection.Count; i++)
-					node.Children.ForEach(f => this.Serialize(writer, f, collection[i]));
-
-				collection.Clear();
-			}
-			else if (node.Property.PropertyType == typeof(string)) {
-				writer.Write((string)child);
-			}
-			else if (node.Property.PropertyType == typeof(bool)) {
-				writer.Write((bool)child);
-			}
-			else if (node.Property.PropertyType == typeof(byte)) {
-				writer.Write((byte)child);
-			}
-			else if (node.Property.PropertyType == typeof(sbyte)) {
-				writer.Write((sbyte)child);
-			}
-			else if (node.Property.PropertyType == typeof(ushort)) {
-				writer.Write((ushort)child);
-			}
-			else if (node.Property.PropertyType == typeof(short)) {
-				writer.Write((short)child);
-			}
-			else if (node.Property.PropertyType == typeof(uint)) {
-				writer.Write((uint)child);
-			}
-			else if (node.Property.PropertyType == typeof(int)) {
-				writer.Write((int)child);
-			}
-			else if (node.Property.PropertyType == typeof(ulong)) {
-				writer.Write((ulong)child);
-			}
-			else if (node.Property.PropertyType == typeof(long)) {
-				writer.Write((long)child);
-			}
-			else if (node.Property.PropertyType == typeof(DateTime)) {
-				writer.Write((ulong)((DateTime)child - MessageHandler<TContext>.DateTimeEpoch).TotalMilliseconds);
-			}
-			else {
-				node.Children.ForEach(f => this.Serialize(writer, f, child));
-			}
+			collection.Clear();
 		}
 
-		public virtual bool IsValid() {
-			return !this.validationProperties.Any(v => !v.Item1.IsValid(v.Item2.GetValue(this)));
-		}
+		private object DeserializeList(BinaryReader reader, ParameterNode node) {
+			var objectConstructor = node.ListType.GetConstructor(Type.EmptyTypes);
+			var collectionConstructor = node.Property.PropertyType.GetConstructor(Type.EmptyTypes);
+			var collection = (IList)collectionConstructor.Invoke(null);
+			var count = reader.ReadUInt16();
 
-		protected void SendNotification(long targetAuthenticatedId, ushort notificationType) {
-			this.SendNotification(targetAuthenticatedId, notificationType, 0);
-		}
+			for (var i = 0; i < count; i++) {
+				var newObject = objectConstructor.Invoke(null);
 
-		protected void SendNotification(long targetAuthenticatedId, ushort notificationType, long objectId) {
-			this.GeneratedNotifications.Add(new Notification(targetAuthenticatedId, notificationType, objectId));
+				node.Children.ForEach(f => this.Deserialize(reader, f, newObject));
+
+				collection.Add(newObject);
+			}
+
+			return collection;
 		}
 	}
 
 	public abstract class ListMessageHandler<TContext, TEntry> : MessageHandler<TContext> {
-		public const int InputStartIndex = 4;
-		public const int OutputStartIndex = 1;
+		public static int InputStartIndex => 4;
+		public static int OutputStartIndex => 1;
 
-		[MessageParameterAttribute(Direction = MessageParameterDirection.Input, Index = 0)]
+		[MessageParameter(Direction = MessageParameterDirection.Input, Index = 0)]
 		[DataAnnotations.AtLeast(0)]
 		public uint Skip { get; set; }
 
-		[MessageParameterAttribute(Direction = MessageParameterDirection.Input, Index = 1)]
+		[MessageParameter(Direction = MessageParameterDirection.Input, Index = 1)]
 		[DataAnnotations.AtLeast(0)]
 		public uint Take { get; set; }
 
-		[MessageParameterAttribute(Direction = MessageParameterDirection.Input, Index = 2)]
+		[MessageParameter(Direction = MessageParameterDirection.Input, Index = 2)]
 		[DataAnnotations.ApiString(MinLength = 1)]
 		public string OrderByField { get; set; }
 
-		[MessageParameterAttribute(Direction = MessageParameterDirection.Input, Index = 3)]
+		[MessageParameter(Direction = MessageParameterDirection.Input, Index = 3)]
 		public bool OrderByAscending { get; set; }
 
-		[MessageParameterAttribute(Direction = MessageParameterDirection.Output, Index = 0)]
-		public List<TEntry> Entries { get; set; }
+		[MessageParameter(Direction = MessageParameterDirection.Output, Index = 0)]
+		public List<TEntry> List { get; set; }
 
-		protected void OrderTakeAndSet(IQueryable<TEntry> query) {
+		protected void SetResponse(IQueryable<TEntry> query) {
 			var parameter = Expression.Parameter(typeof(TEntry));
 			var property = Expression.Property(parameter, this.OrderByField);
 			var sort = Expression.Lambda(property, parameter);
 			var quote = Expression.Quote(sort);
 			var call = Expression.Call(typeof(Queryable), this.OrderByAscending ? "OrderBy" : "OrderByDescending", new[] { typeof(TEntry), property.Type }, query.Expression, quote);
 
-			this.Entries = query.Provider.CreateQuery<TEntry>(call).Skip((int)this.Skip).Take((int)this.Take).ToList();
+			this.List = query.Provider.CreateQuery<TEntry>(call).Skip((int)this.Skip).Take((int)this.Take).ToList();
 		}
 	}
 }
