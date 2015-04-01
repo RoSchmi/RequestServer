@@ -36,22 +36,18 @@ namespace ArkeIndustries.RequestServer {
 		public MessageParameterDirection Direction { get; set; }
 	}
 
-	[AttributeUsage(AttributeTargets.Property)]
-	public class MessageInputAttribute : MessageParameterAttribute {
-
-	}
-
-	[AttributeUsage(AttributeTargets.Property)]
-	public class MessageOutputAttribute : MessageParameterAttribute {
-
-	}
-
 	public abstract class MessageHandler<TContext> {
+		private class Node {
+			public PropertyInfo Property { get; set; }
+			public Type ListType { get; set; }
+			public List<Node> Children { get; set; }
+		}
+
 		public static DateTime DateTimeEpoch { get; set; } = new DateTime(2015, 1, 1, 0, 0, 0);
 
-		private List<PropertyInfo> inputProperties;
-		private List<PropertyInfo> outputProperties;
-		private List<Tuple<PropertyInfo, PropertyInfo>> bindProperties;
+		private List<Node> inputProperties;
+		private List<Node> outputProperties;
+		private List<Tuple<Node, PropertyInfo>> bindProperties;
 		private List<Tuple<ValidationAttribute, PropertyInfo>> validationProperties;
 
 		public long AuthenticatedId { get; set; }
@@ -68,8 +64,8 @@ namespace ArkeIndustries.RequestServer {
 			this.Context = default(TContext);
 			this.GeneratedNotifications = new List<Notification>();
 
-			this.inputProperties = this.GetProperties(this.GetType(), MessageParameterDirection.Input);
-			this.outputProperties = this.GetProperties(this.GetType(), MessageParameterDirection.Output);
+			this.inputProperties = this.CreateTree(MessageParameterDirection.Input);
+			this.outputProperties = this.CreateTree(MessageParameterDirection.Output);
 			this.validationProperties = this.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(p => p.IsDefined(typeof(ValidationAttribute))).Select(p => Tuple.Create(p.GetCustomAttribute<ValidationAttribute>(), p)).ToList();
 		}
 
@@ -81,31 +77,25 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		public void Deserialize(MessageParameterDirection direction, MemoryStream stream) {
-			using (var reader = new BinaryReader(stream)) {
-				var properties = direction == MessageParameterDirection.Input ? this.inputProperties : this.outputProperties;
-
-				foreach (var property in properties)
-					this.Deserialize(direction, reader, property, this);
-			}
+			using (var reader = new BinaryReader(stream))
+				foreach (var property in direction == MessageParameterDirection.Input ? this.inputProperties : this.outputProperties)
+					this.Deserialize(reader, property, this);
 		}
 
 		public void Serialize(MessageParameterDirection direction, MemoryStream stream) {
-			using (var writer = new BinaryWriter(stream)) {
-				var properties = direction == MessageParameterDirection.Input ? this.inputProperties : this.outputProperties;
-
-				foreach (var property in properties)
-					this.Serialize(direction, writer, property, this);
-			}
+			using (var writer = new BinaryWriter(stream))
+				foreach (var property in direction == MessageParameterDirection.Input ? this.inputProperties : this.outputProperties)
+					this.Serialize(writer, property, this);
 		}
 
 		protected void BindResponseObject(object obj) {
 			if (this.bindProperties == null) {
-				this.bindProperties = new List<Tuple<PropertyInfo, PropertyInfo>>();
+				this.bindProperties = new List<Tuple<Node, PropertyInfo>>();
 
 				var boundProperties = obj.GetType().GetProperties();
 
 				foreach (var property in this.outputProperties) {
-					var bound = boundProperties.SingleOrDefault(b => b.Name == property.Name);
+					var bound = boundProperties.SingleOrDefault(b => property.ListType == null && b.Name == property.Property.Name);
 
 					if (bound != null)
 						this.bindProperties.Add(Tuple.Create(property, bound));
@@ -113,106 +103,91 @@ namespace ArkeIndustries.RequestServer {
 			}
 
 			foreach (var p in this.bindProperties)
-				p.Item1.SetValue(this, Convert.ChangeType(p.Item2.GetValue(obj), p.Item2.PropertyType));
+				p.Item1.Property.SetValue(this, Convert.ChangeType(p.Item2.GetValue(obj), p.Item2.PropertyType));
 		}
 
-		private void Deserialize(MessageParameterDirection direction, BinaryReader reader, PropertyInfo property, object o) {
-			if (property.PropertyType == typeof(string)) {
-				property.SetValue(o, reader.ReadString());
+		private List<Node> CreateTree(MessageParameterDirection direction) {
+			return this.GetProperties(this.GetType(), direction).Select(p => this.CreateTree(direction, p)).ToList();
+		}
+
+		private Node CreateTree(MessageParameterDirection direction, PropertyInfo property) {
+			var node = new Node();
+
+			if (!property.PropertyType.GetInterfaces().Any(i => i == typeof(IList))) {
+				node.ListType = null;
+				node.Property = property;
+				node.Children = this.GetProperties(property.PropertyType, direction).Select(p => this.CreateTree(direction, p)).ToList();
 			}
-			else if (property.PropertyType == typeof(bool)) {
-				property.SetValue(o, reader.ReadBoolean());
+			else {
+				node.ListType = property.PropertyType.GenericTypeArguments[0];
+				node.Property = property;
+				node.Children = this.GetProperties(node.ListType, direction).Select(p => this.CreateTree(direction, p)).ToList();
 			}
-			else if (property.PropertyType == typeof(byte)) {
-				property.SetValue(o, reader.ReadByte());
-			}
-			else if (property.PropertyType == typeof(sbyte)) {
-				property.SetValue(o, reader.ReadSByte());
-			}
-			else if (property.PropertyType == typeof(ushort)) {
-				property.SetValue(o, reader.ReadUInt16());
-			}
-			else if (property.PropertyType == typeof(short)) {
-				property.SetValue(o, reader.ReadInt16());
-			}
-			else if (property.PropertyType == typeof(uint)) {
-				property.SetValue(o, reader.ReadUInt32());
-			}
-			else if (property.PropertyType == typeof(int)) {
-				property.SetValue(o, reader.ReadInt32());
-			}
-			else if (property.PropertyType == typeof(ulong)) {
-				property.SetValue(o, reader.ReadUInt64());
-			}
-			else if (property.PropertyType == typeof(long)) {
-				property.SetValue(o, reader.ReadInt64());
-			}
-			else if (property.PropertyType == typeof(DateTime)) {
-				property.SetValue(o, MessageHandler<TContext>.DateTimeEpoch.AddMilliseconds(reader.ReadUInt64()));
-			}
-			else if (property.PropertyType.GetInterfaces().Any(i => i == typeof(IList))) {
-				var itemType = property.PropertyType.GenericTypeArguments[0];
-				var itemConstructor = itemType.GetConstructor(Type.EmptyTypes);
-				var propertyConstructor = property.PropertyType.GetConstructor(Type.EmptyTypes);
+
+			return node;
+		}
+
+		private void Deserialize(BinaryReader reader, Node node, object obj) {
+			if (node.ListType != null) {
+				var constructor = node.ListType.GetConstructor(Type.EmptyTypes);
+				var propertyConstructor = node.Property.PropertyType.GetConstructor(Type.EmptyTypes);
 				var collection = (IList)propertyConstructor.Invoke(null);
 
-				var fields = this.GetProperties(itemType, direction);
+				var fields = node.Children;
 				var count = reader.ReadUInt16();
 
 				for (var i = 0; i < count; i++) {
-					var newObject = itemConstructor.Invoke(null);
+					var newObject = constructor.Invoke(null);
 
-					fields.ForEach(f => this.Deserialize(direction, reader, f, newObject));
+					fields.ForEach(f => this.Deserialize(reader, f, newObject));
 
 					collection.Add(newObject);
 				}
 
-				property.SetValue(o, collection);
+				node.Property.SetValue(obj, collection);
+			}
+			else if (node.Property.PropertyType == typeof(string)) {
+				node.Property.SetValue(obj, reader.ReadString());
+			}
+			else if (node.Property.PropertyType == typeof(bool)) {
+				node.Property.SetValue(obj, reader.ReadBoolean());
+			}
+			else if (node.Property.PropertyType == typeof(byte)) {
+				node.Property.SetValue(obj, reader.ReadByte());
+			}
+			else if (node.Property.PropertyType == typeof(sbyte)) {
+				node.Property.SetValue(obj, reader.ReadSByte());
+			}
+			else if (node.Property.PropertyType == typeof(ushort)) {
+				node.Property.SetValue(obj, reader.ReadUInt16());
+			}
+			else if (node.Property.PropertyType == typeof(short)) {
+				node.Property.SetValue(obj, reader.ReadInt16());
+			}
+			else if (node.Property.PropertyType == typeof(uint)) {
+				node.Property.SetValue(obj, reader.ReadUInt32());
+			}
+			else if (node.Property.PropertyType == typeof(int)) {
+				node.Property.SetValue(obj, reader.ReadInt32());
+			}
+			else if (node.Property.PropertyType == typeof(ulong)) {
+				node.Property.SetValue(obj, reader.ReadUInt64());
+			}
+			else if (node.Property.PropertyType == typeof(long)) {
+				node.Property.SetValue(obj, reader.ReadInt64());
+			}
+			else if (node.Property.PropertyType == typeof(DateTime)) {
+				node.Property.SetValue(obj, MessageHandler<TContext>.DateTimeEpoch.AddMilliseconds(reader.ReadUInt64()));
 			}
 			else {
-				var child = property.GetValue(o);
-
-				this.GetProperties(property.PropertyType, direction).ForEach(f => this.Deserialize(direction, reader, f, child));
+				node.Children.ForEach(f => this.Deserialize(reader, f, node.Property.GetValue(obj)));
 			}
 		}
 
-		private void Serialize(MessageParameterDirection direction, BinaryWriter writer, PropertyInfo property, object o) {
-			var child = property.GetValue(o);
+		private void Serialize(BinaryWriter writer, Node node, object obj) {
+			var child = node.Property.GetValue(obj);
 
-			if (property.PropertyType == typeof(string)) {
-				writer.Write((string)child);
-			}
-			else if (property.PropertyType == typeof(bool)) {
-				writer.Write((bool)child);
-			}
-			else if (property.PropertyType == typeof(byte)) {
-				writer.Write((byte)child);
-			}
-			else if (property.PropertyType == typeof(sbyte)) {
-				writer.Write((sbyte)child);
-			}
-			else if (property.PropertyType == typeof(ushort)) {
-				writer.Write((ushort)child);
-			}
-			else if (property.PropertyType == typeof(short)) {
-				writer.Write((short)child);
-			}
-			else if (property.PropertyType == typeof(uint)) {
-				writer.Write((uint)child);
-			}
-			else if (property.PropertyType == typeof(int)) {
-				writer.Write((int)child);
-			}
-			else if (property.PropertyType == typeof(ulong)) {
-				writer.Write((ulong)child);
-			}
-			else if (property.PropertyType == typeof(long)) {
-				writer.Write((long)child);
-			}
-			else if (property.PropertyType == typeof(DateTime)) {
-				writer.Write((ulong)((DateTime)child - MessageHandler<TContext>.DateTimeEpoch).TotalMilliseconds);
-			}
-			else if (property.PropertyType.GetInterfaces().Any(i => i == typeof(IList))) {
+			if (node.ListType != null) {
 				var collection = (IList)child;
 
 				writer.Write((ushort)collection.Count);
@@ -220,15 +195,46 @@ namespace ArkeIndustries.RequestServer {
 				if (collection.Count == 0)
 					return;
 
-				var fields = this.GetProperties(property.PropertyType.GenericTypeArguments[0], direction);
-
 				for (var i = 0; i < collection.Count; i++)
-					fields.ForEach(f => this.Serialize(direction, writer, f, collection[i]));
+					node.Children.ForEach(f => this.Serialize(writer, f, collection[i]));
 
 				collection.Clear();
 			}
+			else if (node.Property.PropertyType == typeof(string)) {
+				writer.Write((string)child);
+			}
+			else if (node.Property.PropertyType == typeof(bool)) {
+				writer.Write((bool)child);
+			}
+			else if (node.Property.PropertyType == typeof(byte)) {
+				writer.Write((byte)child);
+			}
+			else if (node.Property.PropertyType == typeof(sbyte)) {
+				writer.Write((sbyte)child);
+			}
+			else if (node.Property.PropertyType == typeof(ushort)) {
+				writer.Write((ushort)child);
+			}
+			else if (node.Property.PropertyType == typeof(short)) {
+				writer.Write((short)child);
+			}
+			else if (node.Property.PropertyType == typeof(uint)) {
+				writer.Write((uint)child);
+			}
+			else if (node.Property.PropertyType == typeof(int)) {
+				writer.Write((int)child);
+			}
+			else if (node.Property.PropertyType == typeof(ulong)) {
+				writer.Write((ulong)child);
+			}
+			else if (node.Property.PropertyType == typeof(long)) {
+				writer.Write((long)child);
+			}
+			else if (node.Property.PropertyType == typeof(DateTime)) {
+				writer.Write((ulong)((DateTime)child - MessageHandler<TContext>.DateTimeEpoch).TotalMilliseconds);
+			}
 			else {
-				this.GetProperties(property.PropertyType, direction).ForEach(f => this.Serialize(direction, writer, f, child));
+				node.Children.ForEach(f => this.Serialize(writer, f, child));
 			}
 		}
 
@@ -249,22 +255,22 @@ namespace ArkeIndustries.RequestServer {
 		public const int InputStartIndex = 4;
 		public const int OutputStartIndex = 1;
 
-		[MessageInput(Index = 0)]
+		[MessageParameterAttribute(Direction = MessageParameterDirection.Input, Index = 0)]
 		[DataAnnotations.AtLeast(0)]
 		public uint Skip { get; set; }
 
-		[MessageInput(Index = 1)]
+		[MessageParameterAttribute(Direction = MessageParameterDirection.Input, Index = 1)]
 		[DataAnnotations.AtLeast(0)]
 		public uint Take { get; set; }
 
-		[MessageInput(Index = 2)]
+		[MessageParameterAttribute(Direction = MessageParameterDirection.Input, Index = 2)]
 		[DataAnnotations.ApiString(MinLength = 1)]
 		public string OrderByField { get; set; }
 
-		[MessageInput(Index = 3)]
+		[MessageParameterAttribute(Direction = MessageParameterDirection.Input, Index = 3)]
 		public bool OrderByAscending { get; set; }
 
-		[MessageOutput(Index = 0)]
+		[MessageParameterAttribute(Direction = MessageParameterDirection.Output, Index = 0)]
 		public List<TEntry> Entries { get; set; }
 
 		protected void OrderTakeAndSet(IQueryable<TEntry> query) {
