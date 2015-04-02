@@ -8,11 +8,16 @@ using System.Threading;
 using System.Threading.Tasks;
 
 namespace ArkeIndustries.RequestServer {
-	public class Node<ContextType> where ContextType : MessageContext {
+	public class Node {
+		private class HandlerDefinition {
+			public MessageDefinitionAttribute Attribute { get; set; }
+			public MessageHandler Handler { get; set; }
+		}
+
 		private BlockingCollection<IMessage> outgoingMessages;
 		private BlockingCollection<IMessage> incomingMessages;
 		private BlockingCollection<Notification> notifications;
-		private Dictionary<long, Tuple<MessageDefinitionAttribute, MessageHandler<ContextType>>> handlers;
+		private Dictionary<long, HandlerDefinition> handlers;
 		private List<MessageSource> sources;
 		private CancellationTokenSource cancellationSource;
 		private Task incomingWorker;
@@ -24,19 +29,19 @@ namespace ArkeIndustries.RequestServer {
 		public long MessageRetryAttempts { get; set; } = 5;
 		public long ReceivedMessages { get; set; }
 		public long SentMessages { get; set; }
-		public long PendingIncomingMessages { get { return this.incomingMessages.LongCount(); } }
-		public long PendingOutgoingMessages { get { return this.outgoingMessages.LongCount() + this.notifications.LongCount(); } }
-		public long ConnectionCount { get { return this.sources.Sum(s => s.Connections.Count); } }
+		public long PendingIncomingMessages => this.incomingMessages.LongCount();
+		public long PendingOutgoingMessages => this.outgoingMessages.LongCount() + this.notifications.LongCount();
+		public long ConnectionCount => this.sources.Sum(s => s.Connections.Count);
 
-		public ContextType Context { get; set; }
-		public Updater<ContextType> Updater { get; set; }
+		public MessageContext Context { get; set; }
+		public Updater Updater { get; set; }
 		public IMessageFormat MessageFormat { get; set; }
 
 		public Node() {
 			this.outgoingMessages = new BlockingCollection<IMessage>();
 			this.incomingMessages = new BlockingCollection<IMessage>();
 			this.notifications = new BlockingCollection<Notification>();
-			this.handlers = new Dictionary<long, Tuple<MessageDefinitionAttribute, MessageHandler<ContextType>>>();
+			this.handlers = new Dictionary<long, HandlerDefinition>();
 			this.sources = new List<MessageSource>();
 			this.incomingWorker = new Task(this.ProcessIncomingMessages, TaskCreationOptions.LongRunning);
 			this.outgoingWorker = new Task(this.ProcessOutgoingMessages, TaskCreationOptions.LongRunning);
@@ -53,7 +58,7 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		public void AssociateServerRequests(long serverId) {
-			var type = typeof(MessageHandler<ContextType>);
+			var type = typeof(MessageHandler);
 
 			foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies()) {
 				var childClasses = assembly.GetTypes().Where(t => t.GetType() != type && type.IsAssignableFrom(t));
@@ -61,14 +66,14 @@ namespace ArkeIndustries.RequestServer {
 
 				foreach (var c in matchingClasses) {
 					var attribute = c.GetCustomAttribute<MessageDefinitionAttribute>();
-					var handler = (MessageHandler<ContextType>)c.GetConstructor(Type.EmptyTypes).Invoke(null);
+					var handler = (MessageHandler)c.GetConstructor(Type.EmptyTypes).Invoke(null);
 
 					if (this.handlers.ContainsKey(attribute.Id))
 						throw new InvalidOperationException("This method is already defined.");
 
 					handler.Context = this.Context;
 
-					this.handlers[attribute.Id] = Tuple.Create(attribute, handler);
+					this.handlers[attribute.Id] = new HandlerDefinition() { Attribute = attribute, Handler = handler };
 				}
 			}
 		}
@@ -131,25 +136,24 @@ namespace ArkeIndustries.RequestServer {
 				var handlers = this.handlers;
 
 				if (handlers.ContainsKey(message.RequestId)) {
-					var attr = handlers[message.RequestId].Item1;
-					var handler = handlers[message.RequestId].Item2;
+					var def = handlers[message.RequestId];
 
-					if (message.Connection.AuthenticatedLevel >= attr.AuthenticationLevelRequired) {
-						handler.AuthenticatedId = message.Connection.AuthenticatedId;
-						handler.AuthenticatedLevel = message.Connection.AuthenticatedLevel;
+					if (message.Connection.AuthenticatedLevel >= def.Attribute.AuthenticationLevelRequired) {
+						def.Handler.AuthenticatedId = message.Connection.AuthenticatedId;
+						def.Handler.AuthenticatedLevel = message.Connection.AuthenticatedLevel;
 
-						handler.Context.BeginMessage();
+						def.Handler.Context.BeginMessage();
 
 						try {
-							handler.Deserialize(MessageParameterDirection.Input, message.Body);
+							def.Handler.Deserialize(MessageParameterDirection.Input, message.Body);
 
-							if (handler.Valid) {
-								message.ResponseCode = handler.Perform();
+							if (def.Handler.Valid) {
+								message.ResponseCode = def.Handler.PrepareAndPerform();
 
-								handler.Context.SaveChanges();
+								def.Handler.Context.SaveChanges();
 
-								message.Connection.AuthenticatedId = handler.AuthenticatedId;
-								message.Connection.AuthenticatedLevel = handler.AuthenticatedLevel;
+								message.Connection.AuthenticatedId = def.Handler.AuthenticatedId;
+								message.Connection.AuthenticatedLevel = def.Handler.AuthenticatedLevel;
 							}
 							else {
 								message.ResponseCode = ResponseCode.ParameterValidationFailed;
@@ -173,18 +177,18 @@ namespace ArkeIndustries.RequestServer {
 							}
 						}
 
-						handler.Context.EndMessage();
+						def.Handler.Context.EndMessage();
 
 						if (message.ResponseCode == ResponseCode.Success)
-							handler.Serialize(MessageParameterDirection.Output, responseStream);
+							def.Handler.Serialize(MessageParameterDirection.Output, responseStream);
 
 
-						foreach (var n in handler.GeneratedNotifications)
+						foreach (var n in def.Handler.GeneratedNotifications)
 							this.notifications.Add(n);
 
-						this.SentMessages += handler.GeneratedNotifications.Count;
+						this.SentMessages += def.Handler.GeneratedNotifications.Count;
 
-						handler.GeneratedNotifications.Clear();
+						def.Handler.GeneratedNotifications.Clear();
 					}
 					else {
 						message.ResponseCode = ResponseCode.NotAuthorized;

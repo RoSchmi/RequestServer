@@ -3,18 +3,16 @@ using System.Threading;
 using System.Threading.Tasks;
 
 namespace ArkeIndustries.RequestServer {
-	public abstract class Updater<TContext> where TContext : MessageContext {
+	public abstract class Updater {
 		private bool running;
 		private Task worker;
-		private Node<TContext> node;
 		private CancellationTokenSource sleepCanceller;
 
+		public Node Node { get; set; }
 		public TimeSpan Interval { get; set; }
+		protected MessageContext Context => this.Node.Context;
 
-		protected TContext Context { get { return this.node.Context; } }
-
-		public Updater(Node<TContext> node) {
-			this.node = node;
+		public Updater() {
 			this.running = false;
 		}
 
@@ -39,17 +37,17 @@ namespace ArkeIndustries.RequestServer {
 			while (this.running) {
 				next = next.Add(this.Interval);
 
-				this.node.OnUpdateStarted();
+				this.Node.OnUpdateStarted();
 
-				this.node.Context.BeginMessage();
+				this.Context.BeginMessage();
 
 				this.Tick();
 
-				this.node.Context.SaveChanges();
+				this.Context.SaveChanges();
 
-				this.node.Context.EndMessage();
+				this.Context.EndMessage();
 
-				this.node.OnUpdateFinished();
+				this.Node.OnUpdateFinished();
 
 				try {
 					await Task.Delay(next - DateTime.UtcNow, this.sleepCanceller.Token);
@@ -61,5 +59,9 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		public abstract void Tick();
+	}
+
+	public abstract class Updater<T> : Updater where T : MessageContext {
+		public new T Context => (T)base.Context;
 	}
 }

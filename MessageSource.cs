@@ -9,7 +9,7 @@ namespace ArkeIndustries.RequestServer {
 		private Task worker;
 
 		public BlockingCollection<IMessage> ReceivedMessages { get; set; }
-		public IReadOnlyCollection<Connection> Connections { get { return this.connections; } }
+		public IReadOnlyCollection<Connection> Connections => this.connections;
 
 		protected abstract Task<Connection> AcceptConnection();
 

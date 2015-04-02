@@ -27,7 +27,7 @@ namespace ArkeIndustries.RequestServer {
 		public MessageParameterDirection Direction { get; set; }
 	}
 
-	public abstract class MessageHandler<TContext> {
+	public abstract class MessageHandler {
 		private class ParameterNode {
 			public PropertyInfo Property { get; set; }
 			public Type ListType { get; set; }
@@ -67,22 +67,23 @@ namespace ArkeIndustries.RequestServer {
 
 		public long AuthenticatedId { get; set; }
 		public long AuthenticatedLevel { get; set; }
-		public TContext Context { get; set; }
+		public MessageContext Context { get; set; }
 
 		internal List<Notification> GeneratedNotifications { get; private set; }
 
 		public virtual bool Valid => this.validationProperties.All(p => p.Attributes.All(a => a.IsValid(p.Property.GetValue(this))));
-
 		public virtual long Perform() => ResponseCode.Success;
+
+		public abstract long PrepareAndPerform();
+
 		protected void BindResponse(object obj) => this.BindObject(obj, MessageParameterDirection.Output);
 		protected void SendNotification(long targetAuthenticatedId, long notificationType) => this.SendNotification(targetAuthenticatedId, notificationType, 0);
 		protected void SendNotification(long targetAuthenticatedId, long notificationType, long objectId) => this.GeneratedNotifications.Add(new Notification(targetAuthenticatedId, notificationType, objectId));
 
 		private void AddSerializationDefinition<T>(Action<BinaryWriter, ParameterNode, T> serializer, Func<BinaryReader, ParameterNode, T> deserializer) => this.serializationDefinitions.Add(typeof(T), new SerializationDefinition<T> { Serializer = serializer, Deserializer = deserializer });
 
-		public MessageHandler() {
+		protected MessageHandler() {
 			this.AuthenticatedId = 0;
-			this.Context = default(TContext);
 			this.GeneratedNotifications = new List<Notification>();
 
 			this.inputProperties = this.CreateTree(MessageParameterDirection.Input);
@@ -104,7 +105,7 @@ namespace ArkeIndustries.RequestServer {
 			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadInt32());
 			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadUInt64());
 			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadInt64());
-			this.AddSerializationDefinition((r, p, o) => r.Write((ulong)((o - MessageHandler<TContext>.DateTimeEpoch).TotalMilliseconds)), (w, p) => MessageHandler<TContext>.DateTimeEpoch.AddMilliseconds(w.ReadUInt64()));
+			this.AddSerializationDefinition((r, p, o) => r.Write((ulong)((o - MessageHandler.DateTimeEpoch).TotalMilliseconds)), (w, p) => MessageHandler.DateTimeEpoch.AddMilliseconds(w.ReadUInt64()));
 		}
 
 		public void Serialize(MessageParameterDirection direction, MemoryStream stream) {
@@ -224,7 +225,17 @@ namespace ArkeIndustries.RequestServer {
 		}
 	}
 
-	public abstract class ListMessageHandler<TContext, TEntry> : MessageHandler<TContext> {
+	public abstract class MessageHandler<T> : MessageHandler where T : MessageContext {
+		public new T Context { get; set; }
+		
+		public override long PrepareAndPerform() {
+			this.Context = (T)base.Context;
+
+			return this.Perform();
+		}
+	}
+
+	public abstract class ListMessageHandler<TContext, TEntry> : MessageHandler<TContext> where TContext : MessageContext {
 		public static long InputStartIndex => 4;
 		public static long OutputStartIndex => 1;
 
