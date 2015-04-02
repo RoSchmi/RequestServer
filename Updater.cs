@@ -6,11 +6,11 @@ namespace ArkeIndustries.RequestServer {
 	public abstract class Updater {
 		private bool running;
 		private Task worker;
-		private CancellationTokenSource sleepCanceller;
+		private CancellationTokenSource sleepCanceler;
 
 		public Node Node { get; set; }
 		public TimeSpan Interval { get; set; }
-		protected MessageContext Context => this.Node.Context;
+		public MessageContext Context => this.Node.Context;
 
 		public Updater() {
 			this.running = false;
@@ -18,7 +18,7 @@ namespace ArkeIndustries.RequestServer {
 
 		public void Start() {
 			this.running = true;
-			this.sleepCanceller = new CancellationTokenSource();
+			this.sleepCanceler = new CancellationTokenSource();
 
 			this.worker = new Task(this.DoWork, TaskCreationOptions.LongRunning);
 			this.worker.Start();
@@ -26,7 +26,7 @@ namespace ArkeIndustries.RequestServer {
 
 		public void Stop() {
 			this.running = false;
-			this.sleepCanceller.Cancel();
+			this.sleepCanceler.Cancel();
 
 			this.worker.Wait();
 		}
@@ -50,7 +50,7 @@ namespace ArkeIndustries.RequestServer {
 				this.Node.OnUpdateFinished();
 
 				try {
-					await Task.Delay(next - DateTime.UtcNow, this.sleepCanceller.Token);
+					await Task.Delay(next - DateTime.UtcNow, this.sleepCanceler.Token);
 				}
 				catch (AggregateException e) when (e.InnerExceptions.Count == 1 && e.InnerExceptions[0] is TaskCanceledException) {
 					break;
