@@ -14,8 +14,8 @@ namespace ArkeIndustries.RequestServer {
 			public MessageHandler Handler { get; set; }
 		}
 
-		private BlockingCollection<IMessage> outgoingMessages;
-		private BlockingCollection<IMessage> incomingMessages;
+		private BlockingCollection<IRequest> incomingMessages;
+		private BlockingCollection<IResponse> outgoingMessages;
 		private BlockingCollection<Notification> notifications;
 		private Dictionary<long, HandlerDefinition> handlers;
 		private List<MessageSource> sources;
@@ -103,8 +103,8 @@ namespace ArkeIndustries.RequestServer {
 			this.NotificationsSent = 0;
 			this.NotificationsDropped = 0;
 
-			this.incomingMessages = new BlockingCollection<IMessage>();
-			this.outgoingMessages = new BlockingCollection<IMessage>();
+			this.incomingMessages = new BlockingCollection<IRequest>();
+			this.outgoingMessages = new BlockingCollection<IResponse>();
 			this.notifications = new BlockingCollection<Notification>();
 			this.incomingWorker = new Task(this.ProcessIncomingMessages, TaskCreationOptions.LongRunning);
 			this.outgoingWorker = new Task(this.ProcessOutgoingMessages, TaskCreationOptions.LongRunning);
@@ -162,60 +162,61 @@ namespace ArkeIndustries.RequestServer {
 
 		private void ProcessIncomingMessages() {
 			using (var responseStream = new MemoryStream()) {
-				IMessage message;
+				IResponse response = this.Provider.CreateResponse();
+				IRequest request;
 
 				while (!this.cancellationSource.IsCancellationRequested) {
 					if (this.updating)
 						this.updateEvent.WaitOne();
 
 					try {
-						message = this.incomingMessages.Take(this.cancellationSource.Token);
+						request = this.incomingMessages.Take(this.cancellationSource.Token);
 					}
 					catch (OperationCanceledException) {
 						break;
 					}
 
-					if (this.handlers.ContainsKey(message.RequestId)) {
-						var def = this.handlers[message.RequestId];
+					if (this.handlers.ContainsKey(request.RequestId)) {
+						var def = this.handlers[request.RequestId];
 
-						if (message.Connection.AuthenticatedLevel >= def.Attribute.AuthenticationLevelRequired) {
-							def.Handler.AuthenticatedId = message.Connection.AuthenticatedId;
-							def.Handler.AuthenticatedLevel = message.Connection.AuthenticatedLevel;
+						if (request.Connection.AuthenticatedLevel >= def.Attribute.AuthenticationLevelRequired) {
+							def.Handler.AuthenticatedId = request.Connection.AuthenticatedId;
+							def.Handler.AuthenticatedLevel = request.Connection.AuthenticatedLevel;
 
 							def.Handler.Context?.BeginMessage();
 
 							try {
-								def.Handler.Deserialize(MessageParameterDirection.Input, message.Body);
+								def.Handler.Deserialize(MessageParameterDirection.Input, request.Body);
 
 								if (def.Handler.Valid) {
-									message.ResponseCode = def.Handler.Perform();
+									response.ResponseCode = def.Handler.Perform();
 
 									def.Handler.Context?.SaveChanges();
 
-									message.Connection.AuthenticatedId = def.Handler.AuthenticatedId;
-									message.Connection.AuthenticatedLevel = def.Handler.AuthenticatedLevel;
+									request.Connection.AuthenticatedId = def.Handler.AuthenticatedId;
+									request.Connection.AuthenticatedLevel = def.Handler.AuthenticatedLevel;
 								}
 								else {
-									message.ResponseCode = ResponseCode.ParameterValidationFailed;
+									response.ResponseCode = ResponseCode.ParameterValidationFailed;
 								}
 
 							}
 							catch (EndOfStreamException) {
-								message.ResponseCode = ResponseCode.WrongParameterNumber;
+								response.ResponseCode = ResponseCode.WrongParameterNumber;
 							}
 							catch (MessageContextSaveFailedException e) {
 								if (e.CanRetryMessage) {
-									if (++message.ProcessAttempts <= this.MessageRetryAttempts) {
-										this.incomingMessages.Add(message);
+									if (++request.ProcessAttempts <= this.MessageRetryAttempts) {
+										this.incomingMessages.Add(request);
 									}
 									else {
-										message.ResponseCode = ResponseCode.TryAgainLater;
+										response.ResponseCode = ResponseCode.TryAgainLater;
 
 										this.RequestsDropped++;
 									}
 								}
 								else {
-									message.ResponseCode = e.ResponseCode;
+									response.ResponseCode = e.ResponseCode;
 
 									this.RequestsDropped++;
 								}
@@ -223,7 +224,7 @@ namespace ArkeIndustries.RequestServer {
 
 							def.Handler.Context?.EndMessage();
 
-							if (message.ResponseCode == ResponseCode.Success)
+							if (response.ResponseCode == ResponseCode.Success)
 								def.Handler.Serialize(MessageParameterDirection.Output, responseStream);
 
 							foreach (var n in def.Handler.GeneratedNotifications)
@@ -232,42 +233,43 @@ namespace ArkeIndustries.RequestServer {
 							def.Handler.GeneratedNotifications.Clear();
 						}
 						else {
-							message.ResponseCode = ResponseCode.NotAuthorized;
+							response.ResponseCode = ResponseCode.NotAuthorized;
 						}
 					}
 					else {
-						message.ResponseCode = ResponseCode.WrongRequestId;
+						response.ResponseCode = ResponseCode.WrongRequestId;
 					}
 
-					message.BodyLength = responseStream.Position;
-					message.Body.Seek(0, SeekOrigin.Begin);
+					response.Connection = request.Connection;
+					response.RequestId = request.RequestId;
+					response.BodyLength = responseStream.Position;
 
-					responseStream.CopyTo(message.Body);
+					responseStream.CopyTo(response.Body);
 					responseStream.Seek(0, SeekOrigin.Begin);
 					responseStream.SetLength(0);
 
-					this.outgoingMessages.Add(message);
+					this.outgoingMessages.Add(response);
 				}
 			}
 		}
 
 		private async void ProcessOutgoingMessages() {
-			IMessage message;
+			IResponse response;
 
 			while (!this.cancellationSource.IsCancellationRequested) {
 				try {
-					message = this.outgoingMessages.Take(this.cancellationSource.Token);
+					response = this.outgoingMessages.Take(this.cancellationSource.Token);
 				}
 				catch (OperationCanceledException) {
 					break;
 				}
 
-				if (await message.Connection.Send(message)) {
+				if (await response.Connection.Send(response)) {
 					this.MessagesProcessed++;
 				}
 				else {
-					if (++message.SendAttempts <= this.MessageRetryAttempts) {
-						this.outgoingMessages.Add(message);
+					if (++response.SendAttempts <= this.MessageRetryAttempts) {
+						this.outgoingMessages.Add(response);
 					}
 					else {
 						this.ResponsesDropped++;
@@ -289,25 +291,32 @@ namespace ArkeIndustries.RequestServer {
 
 				var message = this.Provider.CreateNotification(notification.Type, notification.ObjectId);
 
-				foreach (var c in this.FindConnectionsForAuthenticatedId(notification.TargetAuthenticatedId)) {
-					if (await c.Send(message)) {
+				if (notification.Connection != null) {
+					if (await notification.Connection.Send(message)) {
 						this.NotificationsSent++;
 					}
 					else {
 						this.NotificationsDropped++;
 					}
 				}
-
+				else {
+					foreach (var c in this.FindConnectionsForAuthenticatedId(notification.TargetAuthenticatedId)) {
+						if (await c.Send(message)) {
+							this.NotificationsSent++;
+						}
+						else {
+							this.NotificationsDropped++;
+						}
+					}
+				}
 			}
 		}
 
 		private void NotifyAll(long notificationType) {
-			var message = this.Provider.CreateNotification(notificationType, 0);
-
 			foreach (var s in this.sources)
 				lock (s.Connections)
 					foreach (var c in s.Connections)
-						this.outgoingMessages.Add(this.Provider.CreateMessage(c, message.Header));
+						this.notifications.Add(new Notification(c, notificationType, 0));
 		}
 
 		private List<Connection> FindConnectionsForAuthenticatedId(long authenticatedId) {

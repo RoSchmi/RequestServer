@@ -11,7 +11,7 @@ namespace ArkeIndustries.RequestServer {
 
 		protected bool Running { get; private set; }
 
-		public BlockingCollection<IMessage> Destination { get; internal set; }
+		public BlockingCollection<IRequest> Destination { get; internal set; }
 		public IMessageProvider Provider { get; internal set; }
 		public IReadOnlyCollection<Connection> Connections => this.connections;
 

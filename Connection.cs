@@ -15,40 +15,51 @@ namespace ArkeIndustries.RequestServer {
 			this.MessageFormat = null;
 		}
 
-		public async Task<bool> Send(IMessage message) {
-			if (message == null) throw new ArgumentNullException(nameof(message));
+		public async Task<bool> Send(IResponse response) {
+			if (response == null) throw new ArgumentNullException(nameof(response));
 
 			if (!this.Open)
 				return true;
 
-			message.SerializeHeader();
+			response.SerializeHeader();
 
-			if (await this.Send(message.Header.GetBuffer(), 0, this.MessageFormat.HeaderLength)) {
-				return await this.Send(message.Body.GetBuffer(), 0, message.BodyLength);
+			if (await this.Send(response.Header.GetBuffer(), 0, this.MessageFormat.HeaderLength)) {
+				return await this.Send(response.Body.GetBuffer(), 0, response.BodyLength);
             }
 			else {
 				return false;
 			}
 		}
 
-		public async Task<IMessage> Receive() {
+		public async Task<bool> Send(INotification notification) {
+			if (notification == null) throw new ArgumentNullException(nameof(notification));
+
+			if (!this.Open)
+				return true;
+
+			notification.SerializeHeader();
+
+			return await this.Send(notification.Header.GetBuffer(), 0, this.MessageFormat.HeaderLength);
+		}
+
+		public async Task<IRequest> Receive() {
 			if (!this.Open)
 				return null;
 
-			var message = await this.ReceiveHeader();
+			var request = await this.ReceiveHeader();
 			var readSoFar = 0L;
 
-			if (message != null) {
+			if (request != null) {
 				while (true) {
-					var read = await this.Receive(message.Body.GetBuffer(), readSoFar, message.BodyLength - readSoFar);
+					var read = await this.Receive(request.Body.GetBuffer(), readSoFar, request.BodyLength - readSoFar);
 
 					if (read == 0)
 						break;
 
 					readSoFar += read;
 
-					if (readSoFar == message.BodyLength)
-						return message;
+					if (readSoFar == request.BodyLength)
+						return request;
 				}
 			}
 
@@ -57,9 +68,9 @@ namespace ArkeIndustries.RequestServer {
 			return null;
 		}
 
-		private async Task<IMessage> ReceiveHeader() {
+		private async Task<IRequest> ReceiveHeader() {
 			var readSoFar = 0L;
-			var message = this.MessageFormat.CreateMessage();
+			var message = this.MessageFormat.CreateRequest();
 
 			while (true) {
 				var read = await this.Receive(message.Header.GetBuffer(), readSoFar, message.Header.Length - readSoFar);
