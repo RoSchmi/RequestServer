@@ -74,9 +74,7 @@ namespace ArkeIndustries.RequestServer {
 		public virtual bool Valid => this.validationProperties.All(p => p.Attributes.All(a => a.IsValid(p.Property.GetValue(this))));
 		public virtual long Perform() => ResponseCode.Success;
 
-		public abstract long PrepareAndPerform();
-
-		protected void BindResponse(object obj) => this.BindObject(obj, MessageParameterDirection.Output);
+		protected void BindObjectToResponse(object obj) => this.BindObjectToResponse(obj, MessageParameterDirection.Output);
 		protected void SendNotification(long targetAuthenticatedId, long notificationType) => this.SendNotification(targetAuthenticatedId, notificationType, 0);
 		protected void SendNotification(long targetAuthenticatedId, long notificationType, long objectId) => this.GeneratedNotifications.Add(new Notification(targetAuthenticatedId, notificationType, objectId));
 
@@ -120,7 +118,7 @@ namespace ArkeIndustries.RequestServer {
 					this.Deserialize(reader, property, this);
 		}
 
-		protected void BindObject(object obj, MessageParameterDirection direction) {
+		protected void BindObjectToResponse(object obj, MessageParameterDirection direction) {
 			if (this.boundProperties == null) {
 				var sourceProperties = obj.GetType().GetProperties();
 				var targetProperties = direction == MessageParameterDirection.Input ? this.inputProperties : this.outputProperties;
@@ -226,12 +224,13 @@ namespace ArkeIndustries.RequestServer {
 	}
 
 	public abstract class MessageHandler<T> : MessageHandler where T : MessageContext {
-		public new T Context { get; set; }
-		
-		public override long PrepareAndPerform() {
-			this.Context = (T)base.Context;
-
-			return this.Perform();
+		public new T Context {
+			get {
+				return (T)base.Context;
+			}
+			set {
+				base.Context = value;
+			}
 		}
 	}
 

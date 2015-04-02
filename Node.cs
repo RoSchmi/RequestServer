@@ -148,7 +148,7 @@ namespace ArkeIndustries.RequestServer {
 							def.Handler.Deserialize(MessageParameterDirection.Input, message.Body);
 
 							if (def.Handler.Valid) {
-								message.ResponseCode = def.Handler.PrepareAndPerform();
+								message.ResponseCode = def.Handler.Perform();
 
 								def.Handler.Context.SaveChanges();
 
