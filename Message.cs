@@ -39,8 +39,6 @@ namespace ArkeIndustries.RequestServer {
 	public interface INotification {
 		MemoryStream Header { get; }
 
-		long SendAttempts { get; set; }
-
 		void SerializeHeader();
 	}
 }
