@@ -8,7 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 
 namespace ArkeIndustries.RequestServer {
-	public class Node {
+	public class Node : IDisposable {
 		private class HandlerDefinition {
 			public MessageDefinitionAttribute Attribute { get; set; }
 			public MessageHandler Handler { get; set; }
@@ -25,6 +25,8 @@ namespace ArkeIndustries.RequestServer {
 		private Task notificationWorker;
 		private AutoResetEvent updateEvent;
 		private bool updating;
+		private bool disposed;
+		private bool running;
 
 		public long MessageRetryAttempts { get; set; }
 		public long MessagesProcessed { get; set; }
@@ -47,10 +49,16 @@ namespace ArkeIndustries.RequestServer {
 			this.sources = new List<MessageSource>();
 			this.updateEvent = new AutoResetEvent(false);
 			this.updating = false;
+			this.disposed = false;
+			this.running = false;
 		}
 
 		public void AddSource(MessageSource source) {
+			if (source == null) throw new ArgumentNullException(nameof(source));
+			if (this.running) throw new InvalidOperationException("Cannot add a source when running.");
+
 			source.MessageDestination = this.incomingMessages;
+			source.MessageFormat = this.MessageFormat;
 
 			this.sources.Add(source);
 		}
@@ -66,7 +74,7 @@ namespace ArkeIndustries.RequestServer {
 					var handler = (MessageHandler)c.GetConstructor(Type.EmptyTypes).Invoke(null);
 
 					if (this.handlers.ContainsKey(attribute.Id))
-						throw new InvalidOperationException($"The message with id {attribute.Id} is already defined.");
+						throw new MultiplyDefinedMessageHandlerException() { HandlerId = attribute.Id };
 
 					handler.Context = this.Context;
 
@@ -76,14 +84,18 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		public void Start() {
+			if (this.running) throw new InvalidOperationException("Already started.");
+
+			this.running = true;
+
 			this.MessagesProcessed = 0;
 			this.RequestsDropped = 0;
 			this.ResponsesDropped = 0;
 			this.NotificationsSent = 0;
 			this.NotificationsDropped = 0;
 
-			this.outgoingMessages = new BlockingCollection<IMessage>();
 			this.incomingMessages = new BlockingCollection<IMessage>();
+			this.outgoingMessages = new BlockingCollection<IMessage>();
 			this.notifications = new BlockingCollection<Notification>();
 			this.incomingWorker = new Task(this.ProcessIncomingMessages, TaskCreationOptions.LongRunning);
 			this.outgoingWorker = new Task(this.ProcessOutgoingMessages, TaskCreationOptions.LongRunning);
@@ -99,8 +111,12 @@ namespace ArkeIndustries.RequestServer {
 			this.Updater?.Start();
 		}
 
-		public void Stop(int millisecondsToWait) {
-			this.Updater?.Stop();
+		public void Shutdown(int millisecondsToWait) {
+			if (!this.running) throw new InvalidOperationException("Not started.");
+
+			this.running = false;
+
+			this.Updater?.Shutdown();
 
 			this.NotifyAll(NotificationCode.ServerShuttingDown);
 
@@ -109,10 +125,30 @@ namespace ArkeIndustries.RequestServer {
 			this.cancellationSource.Cancel();
 
 			this.incomingWorker.Wait();
-			this.outgoingWorker.Wait();
-			this.notificationWorker.Wait();
+			this.incomingWorker.Dispose();
+			this.incomingWorker = null;
 
-			this.sources.ForEach(s => s.Stop());
+			this.outgoingWorker.Wait();
+			this.outgoingWorker.Dispose();
+			this.outgoingWorker = null;
+
+			this.notificationWorker.Wait();
+			this.notificationWorker.Dispose();
+			this.notificationWorker = null;
+
+			this.sources.ForEach(s => s.Shutdown());
+
+			this.cancellationSource.Dispose();
+			this.cancellationSource = null;
+
+			this.incomingMessages.Dispose();
+			this.incomingMessages = null;
+
+			this.outgoingMessages.Dispose();
+			this.outgoingMessages = null;
+
+			this.notifications.Dispose();
+			this.notifications = null;
 		}
 
 		private void ProcessIncomingMessages() {
@@ -286,6 +322,26 @@ namespace ArkeIndustries.RequestServer {
 			this.updating = false;
 
 			this.updateEvent.Set();
+		}
+
+		protected virtual void Dispose(bool disposing) {
+			if (this.disposed)
+				return;
+
+			if (disposing) {
+				if (this.running)
+					this.Shutdown(1000);
+
+				this.updateEvent.Dispose();
+				this.updateEvent = null;
+			}
+
+			this.disposed = true;
+		}
+
+		public void Dispose() {
+			this.Dispose(true);
+			GC.SuppressFinalize(this);
 		}
 	}
 }

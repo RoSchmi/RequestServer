@@ -3,7 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 
-namespace ArkeIndustries.RequestServer.Sources {
+namespace ArkeIndustries.RequestServer {
 	public class TcpSource : MessageSource {
 		private TcpListener listener;
 		private IPEndPoint endpoint;
@@ -28,31 +28,31 @@ namespace ArkeIndustries.RequestServer.Sources {
 			base.Start();
 		}
 
-		public override void Stop() {
+		public override void Shutdown() {
 			this.listener.Stop();
 
-			base.Stop();
+			base.Shutdown();
 		}
 
 		private class TcpConnection : Connection {
 			private TcpClient client;
-			private NetworkStream stream;
+			private NetworkStream networkStream;
 			private bool disposed;
 
 			public TcpConnection(TcpClient client) {
 				this.client = client;
-				this.stream = client.GetStream();
+				this.networkStream = client.GetStream();
 				this.disposed = false;
 			}
 
 			protected override async Task<bool> Send(MemoryStream stream, long offset, long length) {
-				await this.stream.WriteAsync(stream.GetBuffer(), (int)offset, (int)length);
+				await this.networkStream.WriteAsync(stream.GetBuffer(), (int)offset, (int)length);
 
 				return true;
 			}
 
 			protected override async Task<long> Receive(MemoryStream stream, long offset, long length) {
-				return await this.stream.ReadAsync(stream.GetBuffer(), (int)offset, (int)length);
+				return await this.networkStream.ReadAsync(stream.GetBuffer(), (int)offset, (int)length);
 			}
 
 			protected override void Dispose(bool disposing) {
@@ -63,8 +63,8 @@ namespace ArkeIndustries.RequestServer.Sources {
 					this.client.Dispose();
 					this.client = null;
 
-					this.stream.Dispose();
-					this.stream = null;
+					this.networkStream.Dispose();
+					this.networkStream = null;
 				}
 
 				this.disposed = true;

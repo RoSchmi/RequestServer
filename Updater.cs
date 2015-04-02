@@ -3,25 +3,45 @@ using System.Threading;
 using System.Threading.Tasks;
 
 namespace ArkeIndustries.RequestServer {
-	public abstract class Updater {
+	public abstract class Updater : IDisposable {
 		private Task worker;
 		private CancellationTokenSource cancellationSource;
+		private bool disposed;
+		private bool running;
 
 		public Node Node { get; set; }
 		public TimeSpan Interval { get; set; }
 		public MessageContext Context => this.Node.Context;
 
+		protected Updater() {
+			this.disposed = false;
+			this.running = false;
+		}
+
 		public void Start() {
+			if (this.running) throw new InvalidOperationException("Already started.");
+
+			this.running = true;
+
 			this.cancellationSource = new CancellationTokenSource();
 
 			this.worker = new Task(this.DoWork, TaskCreationOptions.LongRunning);
 			this.worker.Start();
 		}
 
-		public void Stop() {
+		public void Shutdown() {
+			if (!this.running) throw new InvalidOperationException("Not started.");
+
+			this.running = false;
+
 			this.cancellationSource.Cancel();
 
 			this.worker.Wait();
+			this.worker.Dispose();
+			this.worker = null;
+
+			this.cancellationSource.Dispose();
+			this.cancellationSource = null;
 		}
 
 		private async void DoWork() {
@@ -52,6 +72,21 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		public abstract void Tick();
+
+		protected virtual void Dispose(bool disposing) {
+			if (this.disposed)
+				return;
+
+			if (disposing && this.running)
+				this.Shutdown();
+
+			this.disposed = true;
+		}
+
+		public void Dispose() {
+			this.Dispose(true);
+			GC.SuppressFinalize(this);
+		}
 	}
 
 	public abstract class Updater<T> : Updater where T : MessageContext {

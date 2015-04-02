@@ -1,4 +1,6 @@
-﻿using System.Reflection;
+﻿using System;
+using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using System.Runtime.InteropServices;
 
 [assembly: AssemblyTitle("Request Server")]
@@ -13,3 +15,5 @@ using System.Runtime.InteropServices;
 [assembly: Guid("23eaae8b-0758-484c-823a-e1864bf6ede0")]
 [assembly: AssemblyVersion("1.0.0.0")]
 [assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: CLSCompliant(true)]
+[assembly: SuppressMessage("Microsoft.Globalization", "CA1305")]

@@ -1,12 +1,18 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
 
-namespace ArkeIndustries.RequestServer.DataAnnotations {
+namespace ArkeIndustries.RequestServer {
 	[AttributeUsage(AttributeTargets.Property)]
 	public sealed class ApiStringAttribute : ValidationAttribute {
-		public int MinLength { get; set; } = 3;
-		public int MaxLength { get; set; } = 100;
-		public bool AllowWhiteSpace { get; set; } = false;
+		public int MaxLength { get; set; }
+		public int MinLength { get; }
+		public bool AllowWhiteSpace { get; }
+
+		public ApiStringAttribute(int minLength, bool allowWhiteSpace) {
+			this.MinLength = minLength;
+			this.AllowWhiteSpace = allowWhiteSpace;
+			this.MaxLength = 100;
+		}
 
 		public override bool IsValid(object value) {
 			var str = (string)value;
@@ -25,6 +31,8 @@ namespace ArkeIndustries.RequestServer.DataAnnotations {
 		}
 
 		public override bool IsValid(object value) {
+			if (value == null) throw new ArgumentNullException(nameof(value));
+
 			var t = value.GetType();
 
 			if (t == typeof(sbyte)) {

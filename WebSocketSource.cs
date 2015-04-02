@@ -1,17 +1,20 @@
 ﻿using System;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Net;
 using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace ArkeIndustries.RequestServer.Sources {
+namespace ArkeIndustries.RequestServer {
 	public class WebSocketSource : MessageSource {
 		private HttpListener listener;
 		private IPEndPoint endpoint;
+		private bool disposed;
 
         public WebSocketSource(IPEndPoint endpoint) {
 			this.endpoint = endpoint;
+			this.disposed = false;
 		}
 
 		protected override async Task<Connection> AcceptConnection() {
@@ -24,17 +27,36 @@ namespace ArkeIndustries.RequestServer.Sources {
 		}
 
 		public override void Start() {
+			if (this.Running) throw new InvalidOperationException("Already started.");
+
 			this.listener = new HttpListener();
-			this.listener.Prefixes.Add($"http://*:{endpoint.Port}/");
+			this.listener.Prefixes.Add($"http://*:{this.endpoint.Port}/");
 			this.listener.Start();
 
 			base.Start();
 		}
 
-		public override void Stop() {
-			this.listener.Stop();
+		public override void Shutdown() {
+			if (!this.Running) throw new InvalidOperationException("Not started.");
 
-			base.Stop();
+			this.listener.Stop();
+			this.listener.Close();
+			this.listener = null;
+
+			base.Shutdown();
+		}
+
+		[SuppressMessage("Microsoft.Usage", "CA2213", Justification = "Dispose is not a public method.")]
+		protected override void Dispose(bool disposing) {
+			if (this.disposed)
+				return;
+
+			if (disposing && this.Running)
+				this.Shutdown();
+
+			this.disposed = true;
+
+			base.Dispose(disposing);
 		}
 
 		private class WebSocketConnection : Connection {

@@ -4,10 +4,17 @@ using System.Threading.Tasks;
 
 namespace ArkeIndustries.RequestServer {
 	public abstract class Connection : IDisposable {
-		public long AuthenticatedId { get; set; } = 0;
-		public long AuthenticatedLevel { get; set; } = 0;
+		public long AuthenticatedId { get; set; }
+		public long AuthenticatedLevel { get; set; }
 		public bool Open { get; set; } = true;
 		public IMessageFormat MessageFormat { get; set; }
+
+		protected Connection() {
+			this.AuthenticatedId = 0;
+			this.AuthenticatedLevel = 0;
+			this.Open = true;
+			this.MessageFormat = null;
+		}
 
 		public async Task<bool> Send(IMessage message) {
 			if (!this.Open)

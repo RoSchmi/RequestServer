@@ -2,12 +2,12 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Runtime.Serialization;
 
 namespace ArkeIndustries.RequestServer {
 	public enum MessageParameterDirection {
@@ -85,6 +85,7 @@ namespace ArkeIndustries.RequestServer {
 			this.AuthenticatedId = 0;
 			this.GeneratedNotifications = new List<Notification>();
 
+			this.serializationDefinitions = new Dictionary<Type, ISerializationDefinition>();
 			this.inputProperties = this.CreateTree(MessageParameterDirection.Input);
 			this.outputProperties = this.CreateTree(MessageParameterDirection.Output);
 
@@ -93,7 +94,11 @@ namespace ArkeIndustries.RequestServer {
 				.Select(p => new ValidationProperty() { Property = p, Attributes = p.GetCustomAttributes<ValidationAttribute>().ToList() })
 				.ToList();
 
-			this.serializationDefinitions = new Dictionary<Type, ISerializationDefinition>();
+			this.AddSerializationDefinitions();
+		}
+
+		[SuppressMessage("Microsoft.Maintainability", "CA1502")]
+		private void AddSerializationDefinitions() {
 			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadString());
 			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadBoolean());
 			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadByte());
@@ -120,6 +125,8 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		protected void BindObjectToResponse(object source, MessageParameterDirection direction) {
+			if (source == null) throw new ArgumentNullException(nameof(source));
+
 			if (this.boundProperties == null) {
 				var sourceProperties = source.GetType().GetProperties();
 				var targetProperties = direction == MessageParameterDirection.Input ? this.inputProperties : this.outputProperties;
@@ -237,15 +244,15 @@ namespace ArkeIndustries.RequestServer {
 
 	public abstract class ListMessageHandler<TContext, TEntry> : MessageHandler<TContext> where TContext : MessageContext {
 		[MessageParameter(Direction = MessageParameterDirection.Input, Index = -4)]
-		[DataAnnotations.AtLeast(0)]
-		public uint Skip { get; set; }
+		[AtLeast(0)]
+		public int Skip { get; set; }
 
 		[MessageParameter(Direction = MessageParameterDirection.Input, Index = -1)]
-		[DataAnnotations.AtLeast(0)]
-		public uint Take { get; set; }
+		[AtLeast(0)]
+		public int Take { get; set; }
 
 		[MessageParameter(Direction = MessageParameterDirection.Input, Index = -2)]
-		[DataAnnotations.ApiString(MinLength = 1)]
+		[ApiString(1, false)]
 		public string OrderByField { get; set; }
 
 		[MessageParameter(Direction = MessageParameterDirection.Input, Index = -1)]
@@ -255,13 +262,15 @@ namespace ArkeIndustries.RequestServer {
 		public IReadOnlyList<TEntry> List { get; private set; }
 
 		protected void SetResponse(IQueryable<TEntry> query) {
+			if (query == null) throw new ArgumentNullException(nameof(query));
+
 			var parameter = Expression.Parameter(typeof(TEntry));
 			var property = Expression.Property(parameter, this.OrderByField);
 			var sort = Expression.Lambda(property, parameter);
 			var quote = Expression.Quote(sort);
 			var call = Expression.Call(typeof(Queryable), this.OrderByAscending ? "OrderBy" : "OrderByDescending", new[] { typeof(TEntry), property.Type }, query.Expression, quote);
 
-			this.List = query.Provider.CreateQuery<TEntry>(call).Skip((int)this.Skip).Take((int)this.Take).ToList();
+			this.List = query.Provider.CreateQuery<TEntry>(call).Skip(this.Skip).Take(this.Take).ToList();
 		}
 	}
 }
