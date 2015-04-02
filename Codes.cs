@@ -2,7 +2,7 @@
 	public static class ResponseCode {
 		public static long Success => 0;
 		public static long NotAuthorized => 1;
-		public static long WrongMethod => 2;
+		public static long WrongRequestId => 2;
 		public static long WrongParameterNumber => 3;
 		public static long InternalServerError => 4;
 		public static long ParameterValidationFailed => 5;

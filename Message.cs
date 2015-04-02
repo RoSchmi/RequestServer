@@ -5,7 +5,7 @@ namespace ArkeIndustries.RequestServer {
 	public interface IMessageFormat {
 		long HeaderLength { get; }
 
-		IMessage CreateNotification(long notificationType, long objectId);
+		IMessage CreateNotification(long type, long objectId);
 		IMessage CreateMessage();
 		IMessage CreateMessage(Connection connection, MemoryStream header);
 	}

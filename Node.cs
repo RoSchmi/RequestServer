@@ -26,9 +26,12 @@ namespace ArkeIndustries.RequestServer {
 		private AutoResetEvent updateEvent;
 		private bool updating;
 
-		public long MessageRetryAttempts { get; set; } = 5;
-		public long ReceivedMessages { get; set; }
-		public long SentMessages { get; set; }
+		public long MessageRetryAttempts { get; set; }
+		public long MessagesProcessed { get; set; }
+		public long RequestsDropped { get; set; }
+		public long ResponsesDropped { get; set; }
+		public long NotificationsSent { get; set; }
+		public long NotificationsDropped { get; set; }
 		public long PendingIncomingMessages => this.incomingMessages.LongCount();
 		public long PendingOutgoingMessages => this.outgoingMessages.LongCount() + this.notifications.LongCount();
 		public long ConnectionCount => this.sources.Sum(s => s.Connections.Count);
@@ -38,38 +41,32 @@ namespace ArkeIndustries.RequestServer {
 		public IMessageFormat MessageFormat { get; set; }
 
 		public Node() {
-			this.outgoingMessages = new BlockingCollection<IMessage>();
-			this.incomingMessages = new BlockingCollection<IMessage>();
-			this.notifications = new BlockingCollection<Notification>();
+			this.MessageRetryAttempts = 5;
+
 			this.handlers = new Dictionary<long, HandlerDefinition>();
 			this.sources = new List<MessageSource>();
-			this.incomingWorker = new Task(this.ProcessIncomingMessages, TaskCreationOptions.LongRunning);
-			this.outgoingWorker = new Task(this.ProcessOutgoingMessages, TaskCreationOptions.LongRunning);
-			this.notificationWorker = new Task(this.ProcessNotifications, TaskCreationOptions.LongRunning);
-			this.cancellationSource = new CancellationTokenSource();
 			this.updateEvent = new AutoResetEvent(false);
 			this.updating = false;
 		}
 
 		public void AddSource(MessageSource source) {
-			source.ReceivedMessages = this.incomingMessages;
+			source.MessageDestination = this.incomingMessages;
 
 			this.sources.Add(source);
 		}
 
-		public void AssociateServerRequests(long serverId) {
+		public void AssociateMessages(long serverId) {
 			var type = typeof(MessageHandler);
 
 			foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies()) {
-				var childClasses = assembly.GetTypes().Where(t => t.GetType() != type && type.IsAssignableFrom(t));
-				var matchingClasses = childClasses.Where(c => c.IsDefined(typeof(MessageDefinitionAttribute)) && ((c.GetCustomAttribute<MessageDefinitionAttribute>().ServerId & serverId) != 0));
+				var classes = assembly.GetTypes().Where(t => t.GetType() != type && type.IsAssignableFrom(t) && t.IsDefined(typeof(MessageDefinitionAttribute)) && t.GetCustomAttribute<MessageDefinitionAttribute>().ServerId == serverId);
 
-				foreach (var c in matchingClasses) {
+				foreach (var c in classes) {
 					var attribute = c.GetCustomAttribute<MessageDefinitionAttribute>();
 					var handler = (MessageHandler)c.GetConstructor(Type.EmptyTypes).Invoke(null);
 
 					if (this.handlers.ContainsKey(attribute.Id))
-						throw new InvalidOperationException("This method is already defined.");
+						throw new InvalidOperationException($"The message with id {attribute.Id} is already defined.");
 
 					handler.Context = this.Context;
 
@@ -79,6 +76,20 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		public void Start() {
+			this.MessagesProcessed = 0;
+			this.RequestsDropped = 0;
+			this.ResponsesDropped = 0;
+			this.NotificationsSent = 0;
+			this.NotificationsDropped = 0;
+
+			this.outgoingMessages = new BlockingCollection<IMessage>();
+			this.incomingMessages = new BlockingCollection<IMessage>();
+			this.notifications = new BlockingCollection<Notification>();
+			this.incomingWorker = new Task(this.ProcessIncomingMessages, TaskCreationOptions.LongRunning);
+			this.outgoingWorker = new Task(this.ProcessOutgoingMessages, TaskCreationOptions.LongRunning);
+			this.notificationWorker = new Task(this.ProcessNotifications, TaskCreationOptions.LongRunning);
+			this.cancellationSource = new CancellationTokenSource();
+
 			this.incomingWorker.Start();
 			this.outgoingWorker.Start();
 			this.notificationWorker.Start();
@@ -88,8 +99,12 @@ namespace ArkeIndustries.RequestServer {
 			this.Updater?.Start();
 		}
 
-		public void Stop() {
+		public void Stop(int millisecondsToWait) {
+			this.Updater?.Stop();
+
 			this.NotifyAll(NotificationCode.ServerShuttingDown);
+
+			Task.Delay(millisecondsToWait).Wait();
 
 			this.cancellationSource.Cancel();
 
@@ -98,22 +113,6 @@ namespace ArkeIndustries.RequestServer {
 			this.notificationWorker.Wait();
 
 			this.sources.ForEach(s => s.Stop());
-
-			this.Updater?.Stop();
-		}
-
-		internal void OnUpdateStarted() {
-			this.updating = true;
-
-			this.NotifyAll(NotificationCode.UpdateStarted);
-		}
-
-		internal void OnUpdateFinished() {
-			this.NotifyAll(NotificationCode.UpdateFinished);
-
-			this.updating = false;
-
-			this.updateEvent.Set();
 		}
 
 		private void ProcessIncomingMessages() {
@@ -131,12 +130,8 @@ namespace ArkeIndustries.RequestServer {
 					break;
 				}
 
-				this.ReceivedMessages++;
-
-				var handlers = this.handlers;
-
-				if (handlers.ContainsKey(message.RequestId)) {
-					var def = handlers[message.RequestId];
+				if (this.handlers.ContainsKey(message.RequestId)) {
+					var def = this.handlers[message.RequestId];
 
 					if (message.Connection.AuthenticatedLevel >= def.Attribute.AuthenticationLevelRequired) {
 						def.Handler.AuthenticatedId = message.Connection.AuthenticatedId;
@@ -170,10 +165,14 @@ namespace ArkeIndustries.RequestServer {
 								}
 								else {
 									message.ResponseCode = ResponseCode.TryAgainLater;
+
+									this.RequestsDropped++;
 								}
 							}
 							else {
 								message.ResponseCode = e.ResponseCode;
+
+								this.RequestsDropped++;
 							}
 						}
 
@@ -182,11 +181,8 @@ namespace ArkeIndustries.RequestServer {
 						if (message.ResponseCode == ResponseCode.Success)
 							def.Handler.Serialize(MessageParameterDirection.Output, responseStream);
 
-
 						foreach (var n in def.Handler.GeneratedNotifications)
 							this.notifications.Add(n);
-
-						this.SentMessages += def.Handler.GeneratedNotifications.Count;
 
 						def.Handler.GeneratedNotifications.Clear();
 					}
@@ -195,22 +191,23 @@ namespace ArkeIndustries.RequestServer {
 					}
 				}
 				else {
-					message.ResponseCode = ResponseCode.WrongMethod;
+					message.ResponseCode = ResponseCode.WrongRequestId;
 				}
 
-				message.BodyLength = (ushort)(responseStream.Position);
+				message.BodyLength = responseStream.Position;
+				message.Body.Seek(0, SeekOrigin.Begin);
+
 				responseStream.CopyTo(message.Body);
 				responseStream.Seek(0, SeekOrigin.Begin);
 
 				this.outgoingMessages.Add(message);
-				this.SentMessages++;
 			}
 		}
 
 		private async void ProcessOutgoingMessages() {
 			IMessage message;
 
-			while (true) {
+			while (!this.cancellationSource.IsCancellationRequested) {
 				try {
 					message = this.outgoingMessages.Take(this.cancellationSource.Token);
 				}
@@ -218,24 +215,21 @@ namespace ArkeIndustries.RequestServer {
 					break;
 				}
 
-				if (!(await message.Connection.Send(message)) && ++message.SendAttempts <= this.MessageRetryAttempts)
-					this.outgoingMessages.Add(message);
-
-				if (this.cancellationSource.IsCancellationRequested && this.outgoingMessages.Count == 0)
-					break;
+				if (await message.Connection.Send(message)) {
+					this.MessagesProcessed++;
+				}
+				else {
+					if (++message.SendAttempts <= this.MessageRetryAttempts) {
+						this.outgoingMessages.Add(message);
+					}
+					else {
+						this.ResponsesDropped++;
+					}
+				}
 			}
 		}
 
-		private void NotifyAll(long notificationType) {
-			var notification = this.MessageFormat.CreateNotification(notificationType, 0);
-
-			foreach (var s in this.sources)
-				lock (s.Connections)
-					foreach (var c in s.Connections)
-						this.outgoingMessages.Add(this.MessageFormat.CreateMessage(c, notification.Header));
-		}
-
-		private void ProcessNotifications() {
+		private async void ProcessNotifications() {
 			Notification notification;
 
 			while (!this.cancellationSource.IsCancellationRequested) {
@@ -246,11 +240,27 @@ namespace ArkeIndustries.RequestServer {
 					break;
 				}
 
-				var message = this.MessageFormat.CreateNotification(notification.NotificationType, notification.ObjectId);
+				var message = this.MessageFormat.CreateNotification(notification.Type, notification.ObjectId);
 
-				foreach (var c in this.FindConnectionsForAuthenticatedId(notification.TargetAuthenticatedId))
-					this.outgoingMessages.Add(this.MessageFormat.CreateMessage(c, message.Header));
+				foreach (var c in this.FindConnectionsForAuthenticatedId(notification.TargetAuthenticatedId)) {
+					if (await c.Send(message)) {
+						this.NotificationsSent++;
+					}
+					else {
+						this.NotificationsDropped++;
+					}
+				}
+
 			}
+		}
+
+		private void NotifyAll(long notificationType) {
+			var message = this.MessageFormat.CreateNotification(notificationType, 0);
+
+			foreach (var s in this.sources)
+				lock (s.Connections)
+					foreach (var c in s.Connections)
+						this.outgoingMessages.Add(this.MessageFormat.CreateMessage(c, message.Header));
 		}
 
 		private List<Connection> FindConnectionsForAuthenticatedId(long authenticatedId) {
@@ -261,6 +271,20 @@ namespace ArkeIndustries.RequestServer {
 					list.AddRange(s.Connections.Where(c => c.AuthenticatedId == authenticatedId));
 
 			return list;
+		}
+
+		internal void OnUpdateStarted() {
+			this.updating = true;
+
+			this.NotifyAll(NotificationCode.UpdateStarted);
+		}
+
+		internal void OnUpdateFinished() {
+			this.NotifyAll(NotificationCode.UpdateFinished);
+
+			this.updating = false;
+
+			this.updateEvent.Set();
 		}
 	}
 }

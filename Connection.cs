@@ -6,12 +6,21 @@ namespace ArkeIndustries.RequestServer {
 	public abstract class Connection : IDisposable {
 		public long AuthenticatedId { get; set; } = 0;
 		public long AuthenticatedLevel { get; set; } = 0;
+		public bool Open { get; set; } = true;
 		public IMessageFormat MessageFormat { get; set; }
 
 		public async Task<bool> Send(IMessage message) {
+			if (!this.Open)
+				return true;
+
 			message.SerializeHeader();
 
-			return await this.Send(message.Header, 0, message.Header.Length);
+			if (await this.Send(message.Header, 0, this.MessageFormat.HeaderLength)) {
+				return await this.Send(message.Body, 0, message.BodyLength);
+            }
+			else {
+				return false;
+			}
 		}
 
 		public async Task<IMessage> Receive() {

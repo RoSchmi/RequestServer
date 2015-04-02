@@ -8,7 +8,7 @@ namespace ArkeIndustries.RequestServer {
 		private bool running;
 		private Task worker;
 
-		public BlockingCollection<IMessage> ReceivedMessages { get; set; }
+		public BlockingCollection<IMessage> MessageDestination { get; set; }
 		public IReadOnlyCollection<Connection> Connections => this.connections;
 
 		protected abstract Task<Connection> AcceptConnection();
@@ -49,8 +49,10 @@ namespace ArkeIndustries.RequestServer {
 					if (message == null)
 						break;
 
-					this.ReceivedMessages.Add(message);
+					this.MessageDestination.Add(message);
 				}
+
+				connection.Open = false;
 
 				this.connections.Remove(connection);
 			}
