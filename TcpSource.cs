@@ -1,5 +1,4 @@
-﻿using System.IO;
-using System.Net;
+﻿using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 
@@ -45,14 +44,14 @@ namespace ArkeIndustries.RequestServer {
 				this.disposed = false;
 			}
 
-			protected override async Task<bool> Send(MemoryStream stream, long offset, long length) {
-				await this.networkStream.WriteAsync(stream.GetBuffer(), (int)offset, (int)length);
+			protected override async Task<bool> Send(byte[] buffer, long offset, long count) {
+				await this.networkStream.WriteAsync(buffer, (int)offset, (int)count);
 
 				return true;
 			}
 
-			protected override async Task<long> Receive(MemoryStream stream, long offset, long length) {
-				return await this.networkStream.ReadAsync(stream.GetBuffer(), (int)offset, (int)length);
+			protected override async Task<long> Receive(byte[] buffer, long offset, long count) {
+				return await this.networkStream.ReadAsync(buffer, (int)offset, (int)count);
 			}
 
 			protected override void Dispose(bool disposing) {

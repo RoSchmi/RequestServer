@@ -1,13 +1,12 @@
 ﻿using System;
-using System.IO;
 using System.Threading.Tasks;
 
 namespace ArkeIndustries.RequestServer {
 	public abstract class Connection : IDisposable {
+		public bool Open { get; private set; }
 		public long AuthenticatedId { get; set; }
 		public long AuthenticatedLevel { get; set; }
-		public bool Open { get; set; } = true;
-		public IMessageFormat MessageFormat { get; set; }
+		public IMessageProvider MessageFormat { get; set; }
 
 		protected Connection() {
 			this.AuthenticatedId = 0;
@@ -17,13 +16,15 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		public async Task<bool> Send(IMessage message) {
+			if (message == null) throw new ArgumentNullException(nameof(message));
+
 			if (!this.Open)
 				return true;
 
 			message.SerializeHeader();
 
-			if (await this.Send(message.Header, 0, this.MessageFormat.HeaderLength)) {
-				return await this.Send(message.Body, 0, message.BodyLength);
+			if (await this.Send(message.Header.GetBuffer(), 0, this.MessageFormat.HeaderLength)) {
+				return await this.Send(message.Body.GetBuffer(), 0, message.BodyLength);
             }
 			else {
 				return false;
@@ -31,23 +32,29 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		public async Task<IMessage> Receive() {
+			if (!this.Open)
+				return null;
+
 			var message = await this.ReceiveHeader();
 			var readSoFar = 0L;
 
-			if (message == null)
-				return null;
+			if (message != null) {
+				while (true) {
+					var read = await this.Receive(message.Body.GetBuffer(), readSoFar, message.BodyLength - readSoFar);
 
-			while (true) {
-				var read = await this.Receive(message.Body, readSoFar, message.BodyLength - readSoFar);
+					if (read == 0)
+						break;
 
-				if (read == 0)
-					return null;
+					readSoFar += read;
 
-				readSoFar += read;
-
-				if (readSoFar == message.BodyLength)
-					return message;
+					if (readSoFar == message.BodyLength)
+						return message;
+				}
 			}
+
+			this.Open = false;
+
+			return null;
 		}
 
 		private async Task<IMessage> ReceiveHeader() {
@@ -55,7 +62,7 @@ namespace ArkeIndustries.RequestServer {
 			var message = this.MessageFormat.CreateMessage();
 
 			while (true) {
-				var read = await this.Receive(message.Header, readSoFar, message.Header.Length - readSoFar);
+				var read = await this.Receive(message.Header.GetBuffer(), readSoFar, message.Header.Length - readSoFar);
 
 				if (read == 0)
 					return null;
@@ -71,8 +78,8 @@ namespace ArkeIndustries.RequestServer {
 			}
 		}
 
-		protected abstract Task<bool> Send(MemoryStream stream, long offset, long length);
-		protected abstract Task<long> Receive(MemoryStream stream, long offset, long length);
+		protected abstract Task<bool> Send(byte[] buffer, long offset, long count);
+		protected abstract Task<long> Receive(byte[] buffer, long offset, long count);
 
 		protected virtual void Dispose(bool disposing) {
 

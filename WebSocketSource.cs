@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Diagnostics.CodeAnalysis;
-using System.IO;
 using System.Net;
 using System.Net.WebSockets;
 using System.Threading;
@@ -46,7 +45,7 @@ namespace ArkeIndustries.RequestServer {
 			base.Shutdown();
 		}
 
-		[SuppressMessage("Microsoft.Usage", "CA2213", Justification = "Dispose is not a public method.")]
+		[SuppressMessage("Microsoft.Usage", "CA2213", Justification = "HttpListener.Dispose is not public.")]
 		protected override void Dispose(bool disposing) {
 			if (this.disposed)
 				return;
@@ -68,14 +67,14 @@ namespace ArkeIndustries.RequestServer {
 				this.disposed = false;
 			}
 
-			protected override async Task<bool> Send(MemoryStream stream, long offset, long length) {
-				await this.client.SendAsync(new ArraySegment<byte>(stream.GetBuffer(), (int)offset, (int)length), WebSocketMessageType.Binary, true, CancellationToken.None);
+			protected override async Task<bool> Send(byte[] buffer, long offset, long count) {
+				await this.client.SendAsync(new ArraySegment<byte>(buffer, (int)offset, (int)count), WebSocketMessageType.Binary, true, CancellationToken.None);
 
 				return true;
 			}
 
-			protected override async Task<long> Receive(MemoryStream stream, long offset, long length) {
-				var result = await this.client.ReceiveAsync(new ArraySegment<byte>(stream.GetBuffer(), (int)offset, (int)length), CancellationToken.None);
+			protected override async Task<long> Receive(byte[] buffer, long offset, long count) {
+				var result = await this.client.ReceiveAsync(new ArraySegment<byte>(buffer, (int)offset, (int)count), CancellationToken.None);
 
 				return result.MessageType == WebSocketMessageType.Binary ? result.Count : 0;
 			}

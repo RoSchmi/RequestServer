@@ -17,15 +17,26 @@ namespace ArkeIndustries.RequestServer {
 
 	[AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
 	public sealed class MessageDefinitionAttribute : Attribute {
-		public long Id { get; set; }
-		public long ServerId { get; set; }
-		public long AuthenticationLevelRequired { get; set; }
+		public long Id { get; }
+		public long ServerId { get; }
+		public long AuthenticationLevelRequired { get; }
+
+		public MessageDefinitionAttribute(long id, long serverId, long authenticationLevelRequired) {
+			this.Id = id;
+			this.ServerId = serverId;
+			this.AuthenticationLevelRequired = authenticationLevelRequired;
+		}
 	}
 
 	[AttributeUsage(AttributeTargets.Property)]
 	public sealed class MessageParameterAttribute : Attribute {
-		public long Index { get; set; }
-		public MessageParameterDirection Direction { get; set; }
+		public long Index { get; }
+		public MessageParameterDirection Direction { get; }
+
+		public MessageParameterAttribute(long index, MessageParameterDirection direction) {
+			this.Index = index;
+			this.Direction = direction;
+		}
 	}
 
 	public abstract class MessageHandler {
@@ -113,12 +124,16 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		public void Serialize(MessageParameterDirection direction, Stream stream) {
+			if (stream == null) throw new ArgumentNullException(nameof(stream));
+
 			using (var writer = new BinaryWriter(stream))
 				foreach (var property in direction == MessageParameterDirection.Input ? this.inputProperties : this.outputProperties)
 					this.Serialize(writer, property, this);
 		}
 
 		public void Deserialize(MessageParameterDirection direction, Stream stream) {
+			if (stream == null) throw new ArgumentNullException(nameof(stream));
+
 			using (var reader = new BinaryReader(stream))
 				foreach (var property in direction == MessageParameterDirection.Input ? this.inputProperties : this.outputProperties)
 					this.Deserialize(reader, property, this);
@@ -243,22 +258,22 @@ namespace ArkeIndustries.RequestServer {
 	}
 
 	public abstract class ListMessageHandler<TContext, TEntry> : MessageHandler<TContext> where TContext : MessageContext {
-		[MessageParameter(Direction = MessageParameterDirection.Input, Index = -4)]
+		[MessageParameter(-4, MessageParameterDirection.Input)]
 		[AtLeast(0)]
 		public int Skip { get; set; }
 
-		[MessageParameter(Direction = MessageParameterDirection.Input, Index = -1)]
+		[MessageParameter(-3, MessageParameterDirection.Input)]
 		[AtLeast(0)]
 		public int Take { get; set; }
 
-		[MessageParameter(Direction = MessageParameterDirection.Input, Index = -2)]
+		[MessageParameter(-2, MessageParameterDirection.Input)]
 		[ApiString(1, false)]
 		public string OrderByField { get; set; }
 
-		[MessageParameter(Direction = MessageParameterDirection.Input, Index = -1)]
+		[MessageParameter(-1, MessageParameterDirection.Input)]
 		public bool OrderByAscending { get; set; }
 
-		[MessageParameter(Direction = MessageParameterDirection.Output, Index = -1)]
+		[MessageParameter(-1, MessageParameterDirection.Output)]
 		public IReadOnlyList<TEntry> List { get; private set; }
 
 		protected void SetResponse(IQueryable<TEntry> query) {

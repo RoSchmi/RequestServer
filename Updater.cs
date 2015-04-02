@@ -20,6 +20,8 @@ namespace ArkeIndustries.RequestServer {
 
 		public void Start() {
 			if (this.running) throw new InvalidOperationException("Already started.");
+			if (this.Node == null) throw new InvalidOperationException(nameof(this.Node));
+			if (this.Interval == default(TimeSpan)) throw new InvalidOperationException(nameof(this.Interval));
 
 			this.running = true;
 
@@ -52,13 +54,13 @@ namespace ArkeIndustries.RequestServer {
 
 				this.Node.OnUpdateStarted();
 
-				this.Context.BeginMessage();
+				this.Context?.BeginMessage();
 
 				this.Tick();
 
-				this.Context.SaveChanges();
+				this.Context?.SaveChanges();
 
-				this.Context.EndMessage();
+				this.Context?.EndMessage();
 
 				this.Node.OnUpdateFinished();
 

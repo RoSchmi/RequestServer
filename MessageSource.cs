@@ -11,8 +11,8 @@ namespace ArkeIndustries.RequestServer {
 
 		protected bool Running { get; private set; }
 
-		public BlockingCollection<IMessage> MessageDestination { get; internal set; }
-		public IMessageFormat MessageFormat { get; internal set; }
+		public BlockingCollection<IMessage> Destination { get; internal set; }
+		public IMessageProvider Provider { get; internal set; }
 		public IReadOnlyCollection<Connection> Connections => this.connections;
 
 		protected abstract Task<Connection> AcceptConnection();
@@ -26,6 +26,8 @@ namespace ArkeIndustries.RequestServer {
 
 		public virtual void Start() {
 			if (this.Running) throw new InvalidOperationException("Already started.");
+			if (this.Destination == null) throw new InvalidOperationException(nameof(this.Destination));
+			if (this.Provider == null) throw new InvalidOperationException(nameof(this.Provider));
 
 			this.Running = true;
 
@@ -53,7 +55,7 @@ namespace ArkeIndustries.RequestServer {
 				if (connection == null)
 					return;
 
-				connection.MessageFormat = this.MessageFormat;
+				connection.MessageFormat = this.Provider;
 
 				this.connections.Add(connection);
 
@@ -63,10 +65,8 @@ namespace ArkeIndustries.RequestServer {
 					if (message == null)
 						break;
 
-					this.MessageDestination.Add(message);
+					this.Destination.Add(message);
 				}
-
-				connection.Open = false;
 
 				this.connections.Remove(connection);
 			}

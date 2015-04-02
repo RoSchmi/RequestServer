@@ -1,12 +1,12 @@
 ﻿using System.IO;
 
 namespace ArkeIndustries.RequestServer {
-	public interface IMessageFormat {
+	public interface IMessageProvider {
 		long HeaderLength { get; }
 
 		IMessage CreateNotification(long type, long objectId);
 		IMessage CreateMessage();
-		IMessage CreateMessage(Connection connection, MemoryStream header);
+		IMessage CreateMessage(Connection connection, Stream header);
 	}
 
 	public interface IMessage {

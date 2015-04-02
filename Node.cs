@@ -29,23 +29,22 @@ namespace ArkeIndustries.RequestServer {
 		private bool running;
 
 		public long MessageRetryAttempts { get; set; }
-		public long MessagesProcessed { get; set; }
-		public long RequestsDropped { get; set; }
-		public long ResponsesDropped { get; set; }
-		public long NotificationsSent { get; set; }
-		public long NotificationsDropped { get; set; }
+		public long MessagesProcessed { get; private set; }
+		public long RequestsDropped { get; private set; }
+		public long ResponsesDropped { get; private set; }
+		public long NotificationsSent { get; private set; }
+		public long NotificationsDropped { get; private set; }
 		public long PendingIncomingMessages => this.incomingMessages.LongCount();
 		public long PendingOutgoingMessages => this.outgoingMessages.LongCount() + this.notifications.LongCount();
 		public long ConnectionCount => this.sources.Sum(s => s.Connections.Count);
 
 		public MessageContext Context { get; set; }
 		public Updater Updater { get; set; }
-		public IMessageFormat MessageFormat { get; set; }
+		public IMessageProvider Provider { get; set; }
 
 		public Node() {
 			this.MessageRetryAttempts = 5;
 
-			this.handlers = new Dictionary<long, HandlerDefinition>();
 			this.sources = new List<MessageSource>();
 			this.updateEvent = new AutoResetEvent(false);
 			this.updating = false;
@@ -57,14 +56,18 @@ namespace ArkeIndustries.RequestServer {
 			if (source == null) throw new ArgumentNullException(nameof(source));
 			if (this.running) throw new InvalidOperationException("Cannot add a source when running.");
 
-			source.MessageDestination = this.incomingMessages;
-			source.MessageFormat = this.MessageFormat;
+			source.Destination = this.incomingMessages;
+			source.Provider = this.Provider;
 
 			this.sources.Add(source);
 		}
 
-		public void AssociateMessages(long serverId) {
+		public void AssociateHandlers(long serverId) {
+			if (this.running) throw new InvalidOperationException("Cannot associate when running.");
+
 			var type = typeof(MessageHandler);
+
+			this.handlers = new Dictionary<long, HandlerDefinition>();
 
 			foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies()) {
 				var classes = assembly.GetTypes().Where(t => t.GetType() != type && type.IsAssignableFrom(t) && t.IsDefined(typeof(MessageDefinitionAttribute)) && t.GetCustomAttribute<MessageDefinitionAttribute>().ServerId == serverId);
@@ -81,9 +84,15 @@ namespace ArkeIndustries.RequestServer {
 					this.handlers[attribute.Id] = new HandlerDefinition() { Attribute = attribute, Handler = handler };
 				}
 			}
+
+			if (this.handlers.Count == 0)
+				throw new ArgumentException("No handlers found.", nameof(serverId));
 		}
 
 		public void Start() {
+			if (this.Provider == null) throw new InvalidOperationException(nameof(this.Provider));
+			if (this.sources.Count == 0) throw new InvalidOperationException("No sources defined.");
+			if (this.handlers.Count == 0) throw new InvalidOperationException("No handlers associated.");
 			if (this.running) throw new InvalidOperationException("Already started.");
 
 			this.running = true;
@@ -173,7 +182,7 @@ namespace ArkeIndustries.RequestServer {
 							def.Handler.AuthenticatedId = message.Connection.AuthenticatedId;
 							def.Handler.AuthenticatedLevel = message.Connection.AuthenticatedLevel;
 
-							def.Handler.Context.BeginMessage();
+							def.Handler.Context?.BeginMessage();
 
 							try {
 								def.Handler.Deserialize(MessageParameterDirection.Input, message.Body);
@@ -181,7 +190,7 @@ namespace ArkeIndustries.RequestServer {
 								if (def.Handler.Valid) {
 									message.ResponseCode = def.Handler.Perform();
 
-									def.Handler.Context.SaveChanges();
+									def.Handler.Context?.SaveChanges();
 
 									message.Connection.AuthenticatedId = def.Handler.AuthenticatedId;
 									message.Connection.AuthenticatedLevel = def.Handler.AuthenticatedLevel;
@@ -212,7 +221,7 @@ namespace ArkeIndustries.RequestServer {
 								}
 							}
 
-							def.Handler.Context.EndMessage();
+							def.Handler.Context?.EndMessage();
 
 							if (message.ResponseCode == ResponseCode.Success)
 								def.Handler.Serialize(MessageParameterDirection.Output, responseStream);
@@ -235,6 +244,7 @@ namespace ArkeIndustries.RequestServer {
 
 					responseStream.CopyTo(message.Body);
 					responseStream.Seek(0, SeekOrigin.Begin);
+					responseStream.SetLength(0);
 
 					this.outgoingMessages.Add(message);
 				}
@@ -277,7 +287,7 @@ namespace ArkeIndustries.RequestServer {
 					break;
 				}
 
-				var message = this.MessageFormat.CreateNotification(notification.Type, notification.ObjectId);
+				var message = this.Provider.CreateNotification(notification.Type, notification.ObjectId);
 
 				foreach (var c in this.FindConnectionsForAuthenticatedId(notification.TargetAuthenticatedId)) {
 					if (await c.Send(message)) {
@@ -292,12 +302,12 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		private void NotifyAll(long notificationType) {
-			var message = this.MessageFormat.CreateNotification(notificationType, 0);
+			var message = this.Provider.CreateNotification(notificationType, 0);
 
 			foreach (var s in this.sources)
 				lock (s.Connections)
 					foreach (var c in s.Connections)
-						this.outgoingMessages.Add(this.MessageFormat.CreateMessage(c, message.Header));
+						this.outgoingMessages.Add(this.Provider.CreateMessage(c, message.Header));
 		}
 
 		private List<Connection> FindConnectionsForAuthenticatedId(long authenticatedId) {
