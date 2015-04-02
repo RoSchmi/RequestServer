@@ -8,12 +8,12 @@ namespace ArkeIndustries.RequestServer {
 		private bool running;
 		private Task worker;
 
-		public BlockingCollection<IMessage> MessageDestination { get; set; }
+		public BlockingCollection<IMessage> MessageDestination { get; internal set; }
 		public IReadOnlyCollection<Connection> Connections => this.connections;
 
 		protected abstract Task<Connection> AcceptConnection();
 
-		public MessageSource() {
+		protected MessageSource() {
 			this.connections = new List<Connection>();
 			this.running = false;
 		}

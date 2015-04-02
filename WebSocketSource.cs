@@ -25,7 +25,7 @@ namespace ArkeIndustries.RequestServer.Sources {
 
 		public override void Start() {
 			this.listener = new HttpListener();
-			this.listener.Prefixes.Add(string.Format("http://*:{0}/", endpoint.Port));
+			this.listener.Prefixes.Add($"http://*:{endpoint.Port}/");
 			this.listener.Start();
 
 			base.Start();

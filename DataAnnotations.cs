@@ -2,7 +2,8 @@
 using System.ComponentModel.DataAnnotations;
 
 namespace ArkeIndustries.RequestServer.DataAnnotations {
-	public class ApiStringAttribute : ValidationAttribute {
+	[AttributeUsage(AttributeTargets.Property)]
+	public sealed class ApiStringAttribute : ValidationAttribute {
 		public int MinLength { get; set; } = 3;
 		public int MaxLength { get; set; } = 100;
 		public bool AllowWhiteSpace { get; set; } = false;
@@ -14,8 +15,9 @@ namespace ArkeIndustries.RequestServer.DataAnnotations {
 		}
 	}
 
-	public class AtLeastAttribute : ValidationAttribute {
-		public long Value { get; set; } = 0;
+	[AttributeUsage(AttributeTargets.Property)]
+	public sealed class AtLeastAttribute : ValidationAttribute {
+		public long Value { get; } = 0;
 		public bool Inclusive { get; set; } = true;
 
 		public AtLeastAttribute(long value) {
@@ -60,7 +62,8 @@ namespace ArkeIndustries.RequestServer.DataAnnotations {
 		}
 	}
 
-	public class ObjectIdAttribute : ValidationAttribute {
+	[AttributeUsage(AttributeTargets.Property)]
+	public sealed class ObjectIdAttribute : ValidationAttribute {
 		public bool Optional { get; set; } = false;
 
 		public override bool IsValid(object value) {
@@ -68,15 +71,16 @@ namespace ArkeIndustries.RequestServer.DataAnnotations {
 		}
 	}
 
-	public class InEnumAttribute : ValidationAttribute {
-		public Type Type { get; set; }
+	[AttributeUsage(AttributeTargets.Property)]
+	public sealed class InEnumAttribute : ValidationAttribute {
+		public Type EnumType { get; }
 
-		public InEnumAttribute(Type type) {
-			this.Type = type;
+		public InEnumAttribute(Type enumType) {
+			this.EnumType = enumType;
 		}
 
 		public override bool IsValid(object value) {
-			return Enum.IsDefined(this.Type, value);
+			return Enum.IsDefined(this.EnumType, value);
 		}
 	}
 }

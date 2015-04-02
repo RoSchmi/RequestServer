@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
@@ -15,14 +16,14 @@ namespace ArkeIndustries.RequestServer {
 	}
 
 	[AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
-	public class MessageDefinitionAttribute : Attribute {
+	public sealed class MessageDefinitionAttribute : Attribute {
 		public long Id { get; set; }
 		public long ServerId { get; set; }
 		public long AuthenticationLevelRequired { get; set; }
 	}
 
 	[AttributeUsage(AttributeTargets.Property)]
-	public class MessageParameterAttribute : Attribute {
+	public sealed class MessageParameterAttribute : Attribute {
 		public long Index { get; set; }
 		public MessageParameterDirection Direction { get; set; }
 	}
@@ -74,7 +75,7 @@ namespace ArkeIndustries.RequestServer {
 		public virtual bool Valid => this.validationProperties.All(p => p.Attributes.All(a => a.IsValid(p.Property.GetValue(this))));
 		public virtual long Perform() => ResponseCode.Success;
 
-		protected void BindObjectToResponse(object obj) => this.BindObjectToResponse(obj, MessageParameterDirection.Output);
+		protected void BindObjectToResponse(object source) => this.BindObjectToResponse(source, MessageParameterDirection.Output);
 		protected void SendNotification(long targetAuthenticatedId, long notificationType) => this.SendNotification(targetAuthenticatedId, notificationType, 0);
 		protected void SendNotification(long targetAuthenticatedId, long notificationType, long objectId) => this.GeneratedNotifications.Add(new Notification(targetAuthenticatedId, notificationType, objectId));
 
@@ -106,21 +107,21 @@ namespace ArkeIndustries.RequestServer {
 			this.AddSerializationDefinition((r, p, o) => r.Write((ulong)((o - MessageHandler.DateTimeEpoch).TotalMilliseconds)), (w, p) => MessageHandler.DateTimeEpoch.AddMilliseconds(w.ReadUInt64()));
 		}
 
-		public void Serialize(MessageParameterDirection direction, MemoryStream stream) {
+		public void Serialize(MessageParameterDirection direction, Stream stream) {
 			using (var writer = new BinaryWriter(stream))
 				foreach (var property in direction == MessageParameterDirection.Input ? this.inputProperties : this.outputProperties)
 					this.Serialize(writer, property, this);
 		}
 
-		public void Deserialize(MessageParameterDirection direction, MemoryStream stream) {
+		public void Deserialize(MessageParameterDirection direction, Stream stream) {
 			using (var reader = new BinaryReader(stream))
 				foreach (var property in direction == MessageParameterDirection.Input ? this.inputProperties : this.outputProperties)
 					this.Deserialize(reader, property, this);
 		}
 
-		protected void BindObjectToResponse(object obj, MessageParameterDirection direction) {
+		protected void BindObjectToResponse(object source, MessageParameterDirection direction) {
 			if (this.boundProperties == null) {
-				var sourceProperties = obj.GetType().GetProperties();
+				var sourceProperties = source.GetType().GetProperties();
 				var targetProperties = direction == MessageParameterDirection.Input ? this.inputProperties : this.outputProperties;
 
 				this.boundProperties = targetProperties
@@ -130,10 +131,10 @@ namespace ArkeIndustries.RequestServer {
 			}
 
 			foreach (var p in this.boundProperties)
-				p.Parameter.Property.SetValue(this, Convert.ChangeType(p.Property.GetValue(obj), p.Property.PropertyType));
+				p.Parameter.Property.SetValue(this, Convert.ChangeType(p.Property.GetValue(source), p.Property.PropertyType, CultureInfo.InvariantCulture));
 		}
 
-		private List<PropertyInfo> GetProperties(Type type, MessageParameterDirection direction) {
+		private static List<PropertyInfo> GetProperties(Type type, MessageParameterDirection direction) {
 			return type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
 				.Where(p => p.IsDefined(typeof(MessageParameterAttribute)))
 				.Where(p => p.GetCustomAttribute<MessageParameterAttribute>().Direction == direction)
@@ -142,7 +143,7 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		private List<ParameterNode> CreateTree(MessageParameterDirection direction) {
-			return this.GetProperties(this.GetType(), direction).Select(p => this.CreateTree(direction, p)).ToList();
+			return MessageHandler.GetProperties(this.GetType(), direction).Select(p => this.CreateTree(direction, p)).ToList();
 		}
 
 		private ParameterNode CreateTree(MessageParameterDirection direction, PropertyInfo property) {
@@ -151,12 +152,12 @@ namespace ArkeIndustries.RequestServer {
 			if (!property.PropertyType.GetInterfaces().Any(i => i == typeof(IList<>))) {
 				node.ListType = null;
 				node.Property = property;
-				node.Children = this.GetProperties(property.PropertyType, direction).Select(p => this.CreateTree(direction, p)).ToList();
+				node.Children = MessageHandler.GetProperties(property.PropertyType, direction).Select(p => this.CreateTree(direction, p)).ToList();
 			}
 			else {
 				node.ListType = property.PropertyType.GenericTypeArguments.Single();
 				node.Property = property;
-				node.Children = this.GetProperties(node.ListType, direction).Select(p => this.CreateTree(direction, p)).ToList();
+				node.Children = MessageHandler.GetProperties(node.ListType, direction).Select(p => this.CreateTree(direction, p)).ToList();
 			}
 
 			return node;
@@ -235,26 +236,23 @@ namespace ArkeIndustries.RequestServer {
 	}
 
 	public abstract class ListMessageHandler<TContext, TEntry> : MessageHandler<TContext> where TContext : MessageContext {
-		public static long InputStartIndex => 4;
-		public static long OutputStartIndex => 1;
-
-		[MessageParameter(Direction = MessageParameterDirection.Input, Index = 0)]
+		[MessageParameter(Direction = MessageParameterDirection.Input, Index = -4)]
 		[DataAnnotations.AtLeast(0)]
 		public uint Skip { get; set; }
 
-		[MessageParameter(Direction = MessageParameterDirection.Input, Index = 1)]
+		[MessageParameter(Direction = MessageParameterDirection.Input, Index = -1)]
 		[DataAnnotations.AtLeast(0)]
 		public uint Take { get; set; }
 
-		[MessageParameter(Direction = MessageParameterDirection.Input, Index = 2)]
+		[MessageParameter(Direction = MessageParameterDirection.Input, Index = -2)]
 		[DataAnnotations.ApiString(MinLength = 1)]
 		public string OrderByField { get; set; }
 
-		[MessageParameter(Direction = MessageParameterDirection.Input, Index = 3)]
+		[MessageParameter(Direction = MessageParameterDirection.Input, Index = -1)]
 		public bool OrderByAscending { get; set; }
 
-		[MessageParameter(Direction = MessageParameterDirection.Output, Index = 0)]
-		public List<TEntry> List { get; set; }
+		[MessageParameter(Direction = MessageParameterDirection.Output, Index = -1)]
+		public IReadOnlyList<TEntry> List { get; private set; }
 
 		protected void SetResponse(IQueryable<TEntry> query) {
 			var parameter = Expression.Parameter(typeof(TEntry));
