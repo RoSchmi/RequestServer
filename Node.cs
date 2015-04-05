@@ -57,7 +57,6 @@ namespace ArkeIndustries.RequestServer {
 			if (source == null) throw new ArgumentNullException(nameof(source));
 			if (this.running) throw new InvalidOperationException("Cannot add a source when running.");
 
-			source.Destination = this.incomingMessages;
 			source.Provider = this.Provider;
 
 			this.sources.Add(source);
@@ -116,7 +115,10 @@ namespace ArkeIndustries.RequestServer {
 			this.outgoingWorker.Start();
 			this.notificationWorker.Start();
 
-			this.sources.ForEach(s => s.Start());
+			foreach (var s in this.sources) {
+				s.Destination = this.incomingMessages;
+				s.Start();
+			}
 
 			this.Updater?.Start();
 		}
