@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System;
+using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 
@@ -13,14 +14,16 @@ namespace ArkeIndustries.RequestServer {
 
 		protected override async Task<Connection> AcceptConnection() {
 			try {
-				return new TcpConnection(await this.listener.AcceptTcpClientAsync());
+                return new TcpConnection(await this.listener.AcceptTcpClientAsync());
 			}
-			catch (SocketException e) when (e.SocketErrorCode == SocketError.Interrupted) {
+			catch (ObjectDisposedException) {
 				return null;
 			}
 		}
 
 		public override void Start() {
+			if (this.Running) throw new InvalidOperationException("Already started.");
+
 			this.listener = new TcpListener(endpoint);
 			this.listener.Start();
 
@@ -28,9 +31,13 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		public override void Shutdown() {
+			if (!this.Running) throw new InvalidOperationException("Not started.");
+
+			this.BeginShutdown();
+
 			this.listener.Stop();
 
-			base.Shutdown();
+			this.EndShutdown();
 		}
 
 		private class TcpConnection : Connection {
@@ -44,10 +51,10 @@ namespace ArkeIndustries.RequestServer {
 				this.disposed = false;
 			}
 
-			protected override async Task<bool> Send(byte[] buffer, long offset, long count) {
+			protected override async Task<long> Send(byte[] buffer, long offset, long count) {
 				await this.networkStream.WriteAsync(buffer, (int)offset, (int)count);
 
-				return true;
+				return count;
 			}
 
 			protected override async Task<long> Receive(byte[] buffer, long offset, long count) {

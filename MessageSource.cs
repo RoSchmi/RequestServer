@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 
 namespace ArkeIndustries.RequestServer {
@@ -16,6 +17,7 @@ namespace ArkeIndustries.RequestServer {
 		public IReadOnlyCollection<Connection> Connections => this.connections;
 
 		protected abstract Task<Connection> AcceptConnection();
+		public abstract void Shutdown();
 
 		protected MessageSource() {
 			this.connections = new List<Connection>();
@@ -35,14 +37,16 @@ namespace ArkeIndustries.RequestServer {
 			this.worker.Start();
 		}
 
-		public virtual void Shutdown() {
-			if (!this.Running) throw new InvalidOperationException("Not started.");
-
+		protected void BeginShutdown() {
 			this.Running = false;
+		}
 
+		protected void EndShutdown() {
 			this.worker.Wait();
 			this.worker.Dispose();
 			this.worker = null;
+
+			this.connections.ForEach(c => c.Dispose());
 		}
 
 		private async void AcceptConnections() {
@@ -72,6 +76,7 @@ namespace ArkeIndustries.RequestServer {
 			}
 		}
 
+		[SuppressMessage("Microsoft.Usage", "CA2213", Justification = "Task.Dispose is called by EndShutdown which is called by Shutdown.")]
 		protected virtual void Dispose(bool disposing) {
 			if (this.disposed)
 				return;

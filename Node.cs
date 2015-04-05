@@ -165,10 +165,11 @@ namespace ArkeIndustries.RequestServer {
 
 		private void ProcessIncomingMessages() {
 			using (var responseStream = new MemoryStream()) {
-				IResponse response = this.Provider.CreateResponse();
 				IRequest request;
 
 				while (!this.cancellationSource.IsCancellationRequested) {
+					var response = this.Provider.CreateResponse();
+
 					if (this.updating)
 						this.updateEvent.WaitOne();
 
@@ -246,6 +247,7 @@ namespace ArkeIndustries.RequestServer {
 					response.Connection = request.Connection;
 					response.TransactionId = request.TransactionId;
 					response.BodyLength = responseStream.Position;
+					response.SerializeHeader();
 
 					responseStream.CopyTo(response.Body);
 					responseStream.Seek(0, SeekOrigin.Begin);

@@ -10,8 +10,8 @@ namespace ArkeIndustries.RequestServer {
 	}
 
 	public interface IRequest {
-		MemoryStream Header { get; }
-		MemoryStream Body { get; }
+		Stream Header { get; }
+		Stream Body { get; }
 
 		Connection Connection { get; }
 		long ProcessAttempts { get; set; }
@@ -24,8 +24,8 @@ namespace ArkeIndustries.RequestServer {
 	}
 
 	public interface IResponse {
-		MemoryStream Header { get; }
-		MemoryStream Body { get; }
+		Stream Header { get; }
+		Stream Body { get; }
 
 		Connection Connection { get; set; }
 		long SendAttempts { get; set; }

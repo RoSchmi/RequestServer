@@ -11,7 +11,7 @@ namespace ArkeIndustries.RequestServer {
 		private IPEndPoint endpoint;
 		private bool disposed;
 
-        public WebSocketSource(IPEndPoint endpoint) {
+		public WebSocketSource(IPEndPoint endpoint) {
 			this.endpoint = endpoint;
 			this.disposed = false;
 		}
@@ -38,11 +38,13 @@ namespace ArkeIndustries.RequestServer {
 		public override void Shutdown() {
 			if (!this.Running) throw new InvalidOperationException("Not started.");
 
+			this.BeginShutdown();
+
 			this.listener.Stop();
 			this.listener.Close();
 			this.listener = null;
 
-			base.Shutdown();
+			this.EndShutdown();
 		}
 
 		[SuppressMessage("Microsoft.Usage", "CA2213", Justification = "HttpListener.Dispose is not public.")]
@@ -67,16 +69,21 @@ namespace ArkeIndustries.RequestServer {
 				this.disposed = false;
 			}
 
-			protected override async Task<bool> Send(byte[] buffer, long offset, long count) {
+			protected override async Task<long> Send(byte[] buffer, long offset, long count) {
 				await this.client.SendAsync(new ArraySegment<byte>(buffer, (int)offset, (int)count), WebSocketMessageType.Binary, true, CancellationToken.None);
 
-				return true;
+				return count;
 			}
 
 			protected override async Task<long> Receive(byte[] buffer, long offset, long count) {
-				var result = await this.client.ReceiveAsync(new ArraySegment<byte>(buffer, (int)offset, (int)count), CancellationToken.None);
+				try {
+					var result = await this.client.ReceiveAsync(new ArraySegment<byte>(buffer, (int)offset, (int)count), CancellationToken.None);
 
-				return result.MessageType == WebSocketMessageType.Binary ? result.Count : 0;
+					return result.MessageType == WebSocketMessageType.Binary ? result.Count : 0;
+				}
+				catch (WebSocketException e) when ((e.InnerException as HttpListenerException)?.NativeErrorCode == 995) {
+					return 0;
+				}
 			}
 
 			protected override void Dispose(bool disposing) {
