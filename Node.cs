@@ -242,7 +242,7 @@ namespace ArkeIndustries.RequestServer {
 					}
 
 					response.Connection = request.Connection;
-					response.RequestId = request.RequestId;
+					response.TransactionId = request.TransactionId;
 					response.BodyLength = responseStream.Position;
 
 					responseStream.CopyTo(response.Body);

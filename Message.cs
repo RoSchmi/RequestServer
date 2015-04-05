@@ -5,7 +5,7 @@ namespace ArkeIndustries.RequestServer {
 		long HeaderLength { get; }
 
 		INotification CreateNotification(long type, long objectId);
-		IRequest CreateRequest();
+		IRequest CreateRequest(Connection connection);
 		IResponse CreateResponse();
 	}
 
@@ -13,11 +13,12 @@ namespace ArkeIndustries.RequestServer {
 		MemoryStream Header { get; }
 		MemoryStream Body { get; }
 
-		Connection Connection { get; set; }
+		Connection Connection { get; }
 		long ProcessAttempts { get; set; }
 
-		long BodyLength { get; set; }
-		long RequestId { get; set; }
+		long BodyLength { get; }
+		long TransactionId { get; }
+		long RequestId { get; }
 
 		void DeserializeHeader();
 	}
@@ -31,7 +32,7 @@ namespace ArkeIndustries.RequestServer {
 
 		long BodyLength { get; set; }
 		long ResponseCode { get; set; }
-		long RequestId { get; set; }
+		long TransactionId { get; set; }
 
 		void SerializeHeader();
 	}

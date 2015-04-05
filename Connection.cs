@@ -70,7 +70,7 @@ namespace ArkeIndustries.RequestServer {
 
 		private async Task<IRequest> ReceiveHeader() {
 			var readSoFar = 0L;
-			var message = this.MessageFormat.CreateRequest();
+			var message = this.MessageFormat.CreateRequest(this);
 
 			while (true) {
 				var read = await this.Receive(message.Header.GetBuffer(), readSoFar, message.Header.Length - readSoFar);
