@@ -267,7 +267,7 @@ namespace ArkeIndustries.RequestServer {
 		public int Take { get; set; }
 
 		[MessageParameter(-2, MessageParameterDirection.Input)]
-		[ApiString(1, false)]
+		[ApiString(false, 1)]
 		public string OrderByField { get; set; }
 
 		[MessageParameter(-1, MessageParameterDirection.Input)]

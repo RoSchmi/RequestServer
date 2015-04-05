@@ -4,14 +4,18 @@ using System.ComponentModel.DataAnnotations;
 namespace ArkeIndustries.RequestServer {
 	[AttributeUsage(AttributeTargets.Property)]
 	public sealed class ApiStringAttribute : ValidationAttribute {
-		public int MaxLength { get; set; }
+		public int MaxLength { get; }
 		public int MinLength { get; }
 		public bool AllowWhiteSpace { get; }
 
-		public ApiStringAttribute(int minLength, bool allowWhiteSpace) {
+		public ApiStringAttribute(bool allowWhiteSpace, int minLength) : this(allowWhiteSpace, minLength, 100) {
+
+		}
+
+		public ApiStringAttribute(bool allowWhiteSpace, int minLength, int maxLength) {
 			this.MinLength = minLength;
 			this.AllowWhiteSpace = allowWhiteSpace;
-			this.MaxLength = 100;
+			this.MaxLength = maxLength;
 		}
 
 		public override bool IsValid(object value) {
@@ -23,11 +27,16 @@ namespace ArkeIndustries.RequestServer {
 
 	[AttributeUsage(AttributeTargets.Property)]
 	public sealed class AtLeastAttribute : ValidationAttribute {
-		public long Value { get; } = 0;
-		public bool Inclusive { get; set; } = true;
+		public long Value { get; }
+		public bool Inclusive { get; }
 
-		public AtLeastAttribute(long value) {
+		public AtLeastAttribute(long value) : this(value, true) {
+
+		}
+
+		public AtLeastAttribute(long value, bool inclusive) {
 			this.Value = value;
+			this.Inclusive = inclusive;
 		}
 
 		public override bool IsValid(object value) {
@@ -72,7 +81,15 @@ namespace ArkeIndustries.RequestServer {
 
 	[AttributeUsage(AttributeTargets.Property)]
 	public sealed class ObjectIdAttribute : ValidationAttribute {
-		public bool Optional { get; set; } = false;
+		public bool Optional { get; }
+
+		public ObjectIdAttribute() : this(false) {
+
+		}
+
+		public ObjectIdAttribute(bool optional) {
+			this.Optional = optional;
+		}
 
 		public override bool IsValid(object value) {
 			return this.Optional ? (long)value >= 0 : (long)value > 0;
