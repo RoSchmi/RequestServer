@@ -28,16 +28,17 @@ namespace ArkeIndustries.RequestServer {
 		private bool disposed;
 		private bool running;
 
-		public long MessageRetryAttempts { get; set; }
-		public long MessagesProcessed { get; private set; }
+		public long RequestsProcessed { get; private set; }
 		public long RequestsDropped { get; private set; }
 		public long ResponsesDropped { get; private set; }
 		public long NotificationsSent { get; private set; }
 		public long NotificationsDropped { get; private set; }
-		public long PendingIncomingMessages => this.incomingMessages.LongCount();
-		public long PendingOutgoingMessages => this.outgoingMessages.LongCount() + this.notifications.LongCount();
+		public long PendingRequests => this.incomingMessages.LongCount();
+		public long PendingResponses => this.outgoingMessages.LongCount();
+		public long PendingNotifications => this.notifications.LongCount();
 		public long ConnectionCount => this.sources.Sum(s => s.Connections.Count);
 
+		public long MessageRetryAttempts { get; set; }
 		public MessageContext Context { get; set; }
 		public Updater Updater { get; set; }
 		public IMessageProvider Provider { get; set; }
@@ -97,7 +98,7 @@ namespace ArkeIndustries.RequestServer {
 
 			this.running = true;
 
-			this.MessagesProcessed = 0;
+			this.RequestsProcessed = 0;
 			this.RequestsDropped = 0;
 			this.ResponsesDropped = 0;
 			this.NotificationsSent = 0;
@@ -265,7 +266,7 @@ namespace ArkeIndustries.RequestServer {
 				}
 
 				if (await response.Connection.Send(response)) {
-					this.MessagesProcessed++;
+					this.RequestsProcessed++;
 				}
 				else {
 					if (++response.SendAttempts <= this.MessageRetryAttempts) {
