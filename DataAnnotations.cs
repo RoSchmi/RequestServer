@@ -3,12 +3,12 @@
 namespace ArkeIndustries.RequestServer {
 	[AttributeUsage(AttributeTargets.Property)]
 	public abstract class ValidationAttribute : Attribute {
-		public abstract long IsValid(object value);
+		public abstract long IsValid(object value, MessageContext context);
 	}
 
 	[AttributeUsage(AttributeTargets.Property)]
 	public abstract class BasicValidationAttribute : ValidationAttribute {
-		public override long IsValid(object value) {
+		public override long IsValid(object value, MessageContext context) {
 			return this.IsBasicValid(value) ? ResponseCode.Success : ResponseCode.ParameterValidationFailed;
 		}
 

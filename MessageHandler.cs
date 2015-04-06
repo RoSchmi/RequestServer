@@ -126,7 +126,7 @@ namespace ArkeIndustries.RequestServer {
 				var value = p.Property.GetValue(this);
 
 				foreach (var v in p.Attributes) {
-					var valid = v.IsValid(value);
+					var valid = v.IsValid(value, this.Context);
 
 					if (valid != ResponseCode.Success)
 						return valid;
