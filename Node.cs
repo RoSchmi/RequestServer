@@ -198,7 +198,9 @@ namespace ArkeIndustries.RequestServer {
 							try {
 								def.Handler.Deserialize(MessageParameterDirection.Input, request.Body);
 
-								if (def.Handler.Valid) {
+								var valid = def.Handler.IsValid();
+
+								if (valid == ResponseCode.Success) {
 									response.ResponseCode = def.Handler.Perform();
 
 									def.Handler.Context?.SaveChanges();
@@ -207,7 +209,7 @@ namespace ArkeIndustries.RequestServer {
 									request.Connection.AuthenticatedLevel = def.Handler.AuthenticatedLevel;
 								}
 								else {
-									response.ResponseCode = ResponseCode.ParameterValidationFailed;
+									response.ResponseCode = valid;
 								}
 
 							}

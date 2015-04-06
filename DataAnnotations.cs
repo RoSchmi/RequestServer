@@ -1,9 +1,22 @@
 ﻿using System;
-using System.ComponentModel.DataAnnotations;
 
 namespace ArkeIndustries.RequestServer {
 	[AttributeUsage(AttributeTargets.Property)]
-	public sealed class ApiStringAttribute : ValidationAttribute {
+	public abstract class ValidationAttribute : Attribute {
+		public abstract long IsValid(object value);
+	}
+
+	[AttributeUsage(AttributeTargets.Property)]
+	public abstract class BasicValidationAttribute : ValidationAttribute {
+		public override long IsValid(object value) {
+			return this.IsBasicValid(value) ? ResponseCode.Success : ResponseCode.ParameterValidationFailed;
+		}
+
+		protected abstract bool IsBasicValid(object value);
+	}
+
+	[AttributeUsage(AttributeTargets.Property)]
+	public sealed class ApiStringAttribute : BasicValidationAttribute {
 		public int MaxLength { get; }
 		public int MinLength { get; }
 		public bool AllowWhiteSpace { get; }
@@ -18,7 +31,7 @@ namespace ArkeIndustries.RequestServer {
 			this.MaxLength = maxLength;
 		}
 
-		public override bool IsValid(object value) {
+		protected override bool IsBasicValid(object value) {
 			var str = (string)value;
 
 			return str.Length >= this.MinLength && str.Length <= this.MaxLength && (this.AllowWhiteSpace || !string.IsNullOrWhiteSpace(str));
@@ -26,7 +39,7 @@ namespace ArkeIndustries.RequestServer {
 	}
 
 	[AttributeUsage(AttributeTargets.Property)]
-	public sealed class AtLeastAttribute : ValidationAttribute {
+	public sealed class AtLeastAttribute : BasicValidationAttribute {
 		public long Value { get; }
 		public bool Inclusive { get; }
 
@@ -39,7 +52,7 @@ namespace ArkeIndustries.RequestServer {
 			this.Inclusive = inclusive;
 		}
 
-		public override bool IsValid(object value) {
+		protected override bool IsBasicValid(object value) {
 			if (value == null) throw new ArgumentNullException(nameof(value));
 
 			var t = value.GetType();
@@ -80,7 +93,7 @@ namespace ArkeIndustries.RequestServer {
 	}
 
 	[AttributeUsage(AttributeTargets.Property)]
-	public sealed class ObjectIdAttribute : ValidationAttribute {
+	public sealed class ObjectIdAttribute : BasicValidationAttribute {
 		public bool Optional { get; }
 
 		public ObjectIdAttribute() : this(false) {
@@ -91,20 +104,20 @@ namespace ArkeIndustries.RequestServer {
 			this.Optional = optional;
 		}
 
-		public override bool IsValid(object value) {
+		protected override bool IsBasicValid(object value) {
 			return this.Optional ? (long)value >= 0 : (long)value > 0;
 		}
 	}
 
 	[AttributeUsage(AttributeTargets.Property)]
-	public sealed class InEnumAttribute : ValidationAttribute {
+	public sealed class InEnumAttribute : BasicValidationAttribute {
 		public Type EnumType { get; }
 
 		public InEnumAttribute(Type enumType) {
 			this.EnumType = enumType;
 		}
 
-		public override bool IsValid(object value) {
+		protected override bool IsBasicValid(object value) {
 			return Enum.IsDefined(this.EnumType, value);
 		}
 	}

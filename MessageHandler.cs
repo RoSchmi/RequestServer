@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO;
@@ -83,7 +82,6 @@ namespace ArkeIndustries.RequestServer {
 
 		internal List<Notification> GeneratedNotifications { get; private set; }
 
-		public virtual bool Valid => this.validationProperties.All(p => p.Attributes.All(a => a.IsValid(p.Property.GetValue(this))));
 		public virtual long Perform() => ResponseCode.Success;
 
 		protected void BindObjectToResponse(object source) => this.BindObjectToResponse(source, MessageParameterDirection.Output);
@@ -121,6 +119,21 @@ namespace ArkeIndustries.RequestServer {
 			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadUInt64());
 			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadInt64());
 			this.AddSerializationDefinition((r, p, o) => r.Write((ulong)((o - MessageHandler.DateTimeEpoch).TotalMilliseconds)), (w, p) => MessageHandler.DateTimeEpoch.AddMilliseconds(w.ReadUInt64()));
+		}
+
+		public long IsValid() {
+			foreach (var p in this.validationProperties) {
+				var value = p.Property.GetValue(this);
+
+				foreach (var v in p.Attributes) {
+					var valid = v.IsValid(value);
+
+					if (valid != ResponseCode.Success)
+						return valid;
+				}
+			}
+
+			return ResponseCode.Success;
 		}
 
 		public void Serialize(MessageParameterDirection direction, Stream stream) {
