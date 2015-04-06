@@ -26,6 +26,8 @@ namespace ArkeIndustries.RequestServer {
 			if (!this.Open)
 				return true;
 
+			response.Header.SetLength(this.MessageFormat.HeaderLength);
+
 			response.SerializeHeader();
 
 			if (await this.Send(response.Header, this.MessageFormat.HeaderLength)) {
@@ -42,6 +44,8 @@ namespace ArkeIndustries.RequestServer {
 			if (!this.Open)
 				return true;
 
+			notification.Header.SetLength(this.MessageFormat.HeaderLength);
+
 			notification.SerializeHeader();
 
 			return await this.Send(notification.Header, this.MessageFormat.HeaderLength);
@@ -52,6 +56,8 @@ namespace ArkeIndustries.RequestServer {
 				return null;
 
 			var message = this.MessageFormat.CreateRequest(this);
+
+			message.Header.SetLength(this.MessageFormat.HeaderLength);
 
 			if (await this.Receive(message.Header, this.MessageFormat.HeaderLength) == false)
 				return null;
