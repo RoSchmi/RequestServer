@@ -1,9 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
-VisualStudioVersion = 14.0.22310.1
+VisualStudioVersion = 14.0.22609.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Request Server", "Request Server.csproj", "{6BBD8634-10F0-4FA1-BA79-2D7A9AEB3EC7}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ArkeIndustries.RequestServer", "ArkeIndustries.RequestServer.csproj", "{6BBD8634-10F0-4FA1-BA79-2D7A9AEB3EC7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
