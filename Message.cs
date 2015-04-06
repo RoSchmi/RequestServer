@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 
 namespace ArkeIndustries.RequestServer {
 	public interface IMessageProvider {
@@ -9,7 +10,7 @@ namespace ArkeIndustries.RequestServer {
 		IResponse CreateResponse();
 	}
 
-	public interface IRequest {
+	public interface IRequest : IDisposable {
 		Stream Header { get; }
 		Stream Body { get; }
 
@@ -23,7 +24,7 @@ namespace ArkeIndustries.RequestServer {
 		void DeserializeHeader();
 	}
 
-	public interface IResponse {
+	public interface IResponse : IDisposable {
 		Stream Header { get; }
 		Stream Body { get; }
 
@@ -37,7 +38,7 @@ namespace ArkeIndustries.RequestServer {
 		void SerializeHeader();
 	}
 
-	public interface INotification {
+	public interface INotification : IDisposable {
 		MemoryStream Header { get; }
 
 		void SerializeHeader();

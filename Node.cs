@@ -153,9 +153,11 @@ namespace ArkeIndustries.RequestServer {
 			this.cancellationSource.Dispose();
 			this.cancellationSource = null;
 
+			this.incomingMessages.ToList().ForEach(m => m.Dispose());
 			this.incomingMessages.Dispose();
 			this.incomingMessages = null;
 
+			this.outgoingMessages.ToList().ForEach(m => m.Dispose());
 			this.outgoingMessages.Dispose();
 			this.outgoingMessages = null;
 
@@ -253,6 +255,8 @@ namespace ArkeIndustries.RequestServer {
 					responseStream.Seek(0, SeekOrigin.Begin);
 					responseStream.SetLength(0);
 
+					request.Dispose();
+
 					this.outgoingMessages.Add(response);
 				}
 			}
@@ -269,15 +273,17 @@ namespace ArkeIndustries.RequestServer {
 					break;
 				}
 
-				if (await response.Connection.Send(response)) {
-					this.RequestsProcessed++;
-				}
-				else {
-					if (++response.SendAttempts <= this.MessageRetryAttempts) {
-						this.outgoingMessages.Add(response);
+				using (response) {
+					if (await response.Connection.Send(response)) {
+						this.RequestsProcessed++;
 					}
 					else {
-						this.ResponsesDropped++;
+						if (++response.SendAttempts <= this.MessageRetryAttempts) {
+							this.outgoingMessages.Add(response);
+						}
+						else {
+							this.ResponsesDropped++;
+						}
 					}
 				}
 			}
@@ -294,23 +300,23 @@ namespace ArkeIndustries.RequestServer {
 					break;
 				}
 
-				var message = this.Provider.CreateNotification(notification.Type, notification.ObjectId);
-
-				if (notification.Connection != null) {
-					if (await notification.Connection.Send(message)) {
-						this.NotificationsSent++;
-					}
-					else {
-						this.NotificationsDropped++;
-					}
-				}
-				else {
-					foreach (var c in this.FindConnectionsForAuthenticatedId(notification.TargetAuthenticatedId)) {
-						if (await c.Send(message)) {
+				using (var message = this.Provider.CreateNotification(notification.Type, notification.ObjectId)) {
+					if (notification.Connection != null) {
+						if (await notification.Connection.Send(message)) {
 							this.NotificationsSent++;
 						}
 						else {
 							this.NotificationsDropped++;
+						}
+					}
+					else {
+						foreach (var c in this.FindConnectionsForAuthenticatedId(notification.TargetAuthenticatedId)) {
+							if (await c.Send(message)) {
+								this.NotificationsSent++;
+							}
+							else {
+								this.NotificationsDropped++;
+							}
 						}
 					}
 				}
