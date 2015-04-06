@@ -19,6 +19,7 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		public void Start() {
+			if (this.disposed) throw new ObjectDisposedException(nameof(Updater));
 			if (this.running) throw new InvalidOperationException("Already started.");
 			if (this.Node == null) throw new InvalidOperationException(nameof(this.Node));
 			if (this.Interval == default(TimeSpan)) throw new InvalidOperationException(nameof(this.Interval));
@@ -32,6 +33,7 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		public void Shutdown() {
+			if (this.disposed) throw new ObjectDisposedException(nameof(Updater));
 			if (!this.running) throw new InvalidOperationException("Not started.");
 
 			this.running = false;

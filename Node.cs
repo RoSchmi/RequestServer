@@ -54,6 +54,7 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		public void AddSource(MessageSource source) {
+			if (this.disposed) throw new ObjectDisposedException(nameof(Node));
 			if (source == null) throw new ArgumentNullException(nameof(source));
 			if (this.running) throw new InvalidOperationException("Cannot add a source when running.");
 
@@ -63,6 +64,7 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		public void AssociateHandlers(long serverId) {
+			if (this.disposed) throw new ObjectDisposedException(nameof(Node));
 			if (this.running) throw new InvalidOperationException("Cannot associate when running.");
 
 			var type = typeof(MessageHandler);
@@ -90,6 +92,7 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		public void Start() {
+			if (this.disposed) throw new ObjectDisposedException(nameof(Node));
 			if (this.Provider == null) throw new InvalidOperationException(nameof(this.Provider));
 			if (this.sources.Count == 0) throw new InvalidOperationException("No sources defined.");
 			if (this.handlers.Count == 0) throw new InvalidOperationException("No handlers associated.");
@@ -124,6 +127,7 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		public void Shutdown(int millisecondsToWait) {
+			if (this.disposed) throw new ObjectDisposedException(nameof(Node));
 			if (!this.running) throw new InvalidOperationException("Not started.");
 
 			this.running = false;

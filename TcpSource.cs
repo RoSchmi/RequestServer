@@ -7,9 +7,11 @@ namespace ArkeIndustries.RequestServer {
 	public class TcpSource : MessageSource {
 		private TcpListener listener;
 		private IPEndPoint endpoint;
+		private bool disposed;
 
 		public TcpSource(IPEndPoint endpoint) {
 			this.endpoint = endpoint;
+			this.disposed = false;
 		}
 
 		protected override async Task<Connection> AcceptConnection() {
@@ -22,6 +24,7 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		public override void Start() {
+			if (this.disposed) throw new ObjectDisposedException(nameof(TcpSource));
 			if (this.Running) throw new InvalidOperationException("Already started.");
 
 			this.listener = new TcpListener(endpoint);
@@ -31,6 +34,7 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		public override void Shutdown() {
+			if (this.disposed) throw new ObjectDisposedException(nameof(TcpSource));
 			if (!this.Running) throw new InvalidOperationException("Not started.");
 
 			this.BeginShutdown();
@@ -38,6 +42,15 @@ namespace ArkeIndustries.RequestServer {
 			this.listener.Stop();
 
 			this.EndShutdown();
+		}
+
+		protected override void Dispose(bool disposing) {
+			if (this.disposed)
+				return;
+
+			this.disposed = true;
+
+			base.Dispose(disposing);
 		}
 
 		private class TcpConnection : Connection {

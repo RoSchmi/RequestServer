@@ -26,6 +26,7 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		public override void Start() {
+			if (this.disposed) throw new ObjectDisposedException(nameof(WebSocketSource));
 			if (this.Running) throw new InvalidOperationException("Already started.");
 
 			this.listener = new HttpListener();
@@ -36,6 +37,7 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		public override void Shutdown() {
+			if (this.disposed) throw new ObjectDisposedException(nameof(WebSocketSource));
 			if (!this.Running) throw new InvalidOperationException("Not started.");
 
 			this.BeginShutdown();

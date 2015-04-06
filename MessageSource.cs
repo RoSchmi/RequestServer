@@ -27,6 +27,7 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		public virtual void Start() {
+			if (this.disposed) throw new ObjectDisposedException(nameof(MessageSource));
 			if (this.Running) throw new InvalidOperationException("Already started.");
 			if (this.Destination == null) throw new InvalidOperationException(nameof(this.Destination));
 			if (this.Provider == null) throw new InvalidOperationException(nameof(this.Provider));

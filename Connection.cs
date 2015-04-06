@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 namespace ArkeIndustries.RequestServer {
 	public abstract class Connection : IDisposable {
 		private byte[] block;
+		private bool disposed;
 
 		public bool Open { get; private set; }
 		public long AuthenticatedId { get; set; }
@@ -17,10 +18,12 @@ namespace ArkeIndustries.RequestServer {
 			this.Open = true;
 			this.MessageFormat = null;
 
+			this.disposed = false;
 			this.block = new byte[512];
 		}
 
 		public async Task<bool> Send(IResponse response) {
+			if (this.disposed) throw new ObjectDisposedException(nameof(Connection));
 			if (response == null) throw new ArgumentNullException(nameof(response));
 
 			if (!this.Open)
@@ -39,6 +42,7 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		public async Task<bool> Send(INotification notification) {
+			if (this.disposed) throw new ObjectDisposedException(nameof(Connection));
 			if (notification == null) throw new ArgumentNullException(nameof(notification));
 
 			if (!this.Open)
@@ -52,6 +56,8 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		public async Task<IRequest> Receive() {
+			if (this.disposed) throw new ObjectDisposedException(nameof(Connection));
+
 			if (!this.Open)
 				return null;
 
@@ -127,7 +133,7 @@ namespace ArkeIndustries.RequestServer {
 		protected abstract Task<long> Receive(byte[] buffer, long offset, long count);
 
 		protected virtual void Dispose(bool disposing) {
-
+			this.disposed = true;
 		}
 
 		public void Dispose() {
