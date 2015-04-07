@@ -190,10 +190,11 @@ namespace ArkeIndustries.RequestServer {
 						var def = this.handlers[request.RequestId];
 
 						if (request.Connection.AuthenticatedLevel >= def.Attribute.AuthenticationLevelRequired) {
-							def.Handler.AuthenticatedId = request.Connection.AuthenticatedId;
-							def.Handler.AuthenticatedLevel = request.Connection.AuthenticatedLevel;
-
-							def.Handler.Context?.BeginMessage();
+							if (this.Context != null) {
+								this.Context.AuthenticatedId = request.Connection.AuthenticatedId;
+								this.Context.AuthenticatedLevel = request.Connection.AuthenticatedLevel;
+								this.Context.BeginMessage();
+							}
 
 							try {
 								def.Handler.Deserialize(MessageParameterDirection.Input, request.Body);
@@ -203,10 +204,12 @@ namespace ArkeIndustries.RequestServer {
 								if (valid == ResponseCode.Success) {
 									response.ResponseCode = def.Handler.Perform();
 
-									def.Handler.Context?.SaveChanges();
+									if (this.Context != null) {
+										this.Context.SaveChanges();
 
-									request.Connection.AuthenticatedId = def.Handler.AuthenticatedId;
-									request.Connection.AuthenticatedLevel = def.Handler.AuthenticatedLevel;
+										request.Connection.AuthenticatedId = this.Context.AuthenticatedId;
+										request.Connection.AuthenticatedLevel = this.Context.AuthenticatedLevel;
+									}
 								}
 								else {
 									response.ResponseCode = valid;
@@ -234,7 +237,7 @@ namespace ArkeIndustries.RequestServer {
 								}
 							}
 
-							def.Handler.Context?.EndMessage();
+							this.Context?.EndMessage();
 
 							if (response.ResponseCode == ResponseCode.Success)
 								def.Handler.Serialize(MessageParameterDirection.Output, responseStream);

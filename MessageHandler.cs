@@ -76,8 +76,6 @@ namespace ArkeIndustries.RequestServer {
 		private List<ValidationProperty> validationProperties;
 		private Dictionary<Type, ISerializationDefinition> serializationDefinitions;
 
-		public long AuthenticatedId { get; set; }
-		public long AuthenticatedLevel { get; set; }
 		public MessageContext Context { get; set; }
 
 		internal List<Notification> GeneratedNotifications { get; private set; }
@@ -91,7 +89,6 @@ namespace ArkeIndustries.RequestServer {
 		private void AddSerializationDefinition<T>(Action<BinaryWriter, ParameterNode, T> serializer, Func<BinaryReader, ParameterNode, T> deserializer) => this.serializationDefinitions.Add(typeof(T), new SerializationDefinition<T> { Serializer = serializer, Deserializer = deserializer });
 
 		protected MessageHandler() {
-			this.AuthenticatedId = 0;
 			this.GeneratedNotifications = new List<Notification>();
 
 			this.serializationDefinitions = new Dictionary<Type, ISerializationDefinition>();
