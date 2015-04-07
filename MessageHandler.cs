@@ -39,13 +39,13 @@ namespace ArkeIndustries.RequestServer {
 	}
 
 	public abstract class MessageHandler {
-		private class ParameterNode {
+		internal class ParameterNode {
 			public PropertyInfo Property { get; set; }
 			public Type ListType { get; set; }
 			public List<ParameterNode> Children { get; set; }
 		}
 
-		private class BoundProperty {
+		internal class BoundProperty {
 			public PropertyInfo Property { get; set; }
 			public ParameterNode Parameter { get; set; }
 		}
@@ -155,21 +155,23 @@ namespace ArkeIndustries.RequestServer {
 		protected void BindObjectToResponse(object source, MessageParameterDirection direction) {
 			if (source == null) throw new ArgumentNullException(nameof(source));
 
-			if (this.boundProperties == null) {
-				var sourceProperties = source.GetType().GetProperties();
-				var targetProperties = direction == MessageParameterDirection.Input ? this.inputProperties : this.outputProperties;
-
-				this.boundProperties = targetProperties
-					.Where(p => sourceProperties.Any(s => s.Name == p.Property.Name))
-					.Select(p => new BoundProperty() { Parameter = p, Property = sourceProperties.SingleOrDefault(b => b.Name == p.Property.Name) })
-					.ToList();
-			}
+			if (this.boundProperties == null)
+				this.boundProperties = MessageHandler.GetPropertiesToBind(source.GetType(), direction == MessageParameterDirection.Input ? this.inputProperties : this.outputProperties);
 
 			foreach (var p in this.boundProperties)
 				p.Parameter.Property.SetValue(this, Convert.ChangeType(p.Property.GetValue(source), p.Property.PropertyType, CultureInfo.InvariantCulture));
 		}
 
-		private static List<PropertyInfo> GetProperties(Type type, MessageParameterDirection direction) {
+		internal static List<BoundProperty> GetPropertiesToBind(Type type, List<ParameterNode> targetProperties) {
+			var sourceProperties = type.GetProperties();
+
+			return targetProperties
+				.Where(p => sourceProperties.Any(s => s.Name == p.Property.Name))
+				.Select(p => new BoundProperty() { Parameter = p, Property = sourceProperties.SingleOrDefault(b => b.Name == p.Property.Name) })
+				.ToList();
+		}
+
+		internal static List<PropertyInfo> GetProperties(Type type, MessageParameterDirection direction) {
 			return type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
 				.Where(p => p.IsDefined(typeof(MessageParameterAttribute)))
 				.Where(p => p.GetCustomAttribute<MessageParameterAttribute>().Direction == direction)
@@ -178,7 +180,11 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		private List<ParameterNode> CreateTree(MessageParameterDirection direction) {
-			return MessageHandler.GetProperties(this.GetType(), direction).Select(p => this.CreateTree(direction, p)).ToList();
+			return this.CreateTree(direction, this.GetType());
+		}
+
+		internal List<ParameterNode> CreateTree(MessageParameterDirection direction, Type type) {
+			return MessageHandler.GetProperties(type, direction).Select(p => this.CreateTree(direction, p)).ToList();
 		}
 
 		private ParameterNode CreateTree(MessageParameterDirection direction, PropertyInfo property) {
@@ -270,7 +276,9 @@ namespace ArkeIndustries.RequestServer {
 		}
 	}
 
-	public abstract class ListMessageHandler<TContext, TEntry> : MessageHandler<TContext> where TContext : MessageContext {
+	public abstract class ListMessageHandler<TContext, TEntry> : MessageHandler<TContext> where TContext : MessageContext where TEntry : new() {
+		private List<BoundProperty> boundProperties;
+
 		[MessageParameter(-4, MessageParameterDirection.Input)]
 		[AtLeast(0)]
 		public int Skip { get; set; }
@@ -299,6 +307,31 @@ namespace ArkeIndustries.RequestServer {
 			var call = Expression.Call(typeof(Queryable), this.OrderByAscending ? "OrderBy" : "OrderByDescending", new[] { typeof(TEntry), property.Type }, query.Expression, quote);
 
 			this.List = query.Provider.CreateQuery<TEntry>(call).Skip(this.Skip).Take(this.Take).ToList();
+		}
+
+		protected void BindListToResponse<T>(IQueryable<T> query) {
+			if (query == null) throw new ArgumentNullException(nameof(query));
+
+			var parameter = Expression.Parameter(typeof(T));
+			var property = Expression.Property(parameter, this.OrderByField);
+			var sort = Expression.Lambda(property, parameter);
+			var quote = Expression.Quote(sort);
+			var call = Expression.Call(typeof(Queryable), this.OrderByAscending ? "OrderBy" : "OrderByDescending", new[] { typeof(T), property.Type }, query.Expression, quote);
+
+			if (this.boundProperties == null)
+				this.boundProperties = MessageHandler.GetPropertiesToBind(typeof(T), this.CreateTree(MessageParameterDirection.Output, typeof(TEntry)));
+
+			var result = new List<TEntry>();
+			foreach (var sourceEntry in query.Provider.CreateQuery<T>(call).Skip(this.Skip).Take(this.Take)) {
+				var resultEntry = new TEntry();
+
+				foreach (var p in this.boundProperties)
+					p.Parameter.Property.SetValue(resultEntry, Convert.ChangeType(p.Property.GetValue(sourceEntry), p.Property.PropertyType, CultureInfo.InvariantCulture));
+
+				result.Add(resultEntry);
+			}
+
+			this.List = result;
 		}
 	}
 }
