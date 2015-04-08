@@ -85,7 +85,7 @@ namespace ArkeIndustries.RequestServer {
 
 		public virtual long Perform() => ResponseCode.Success;
 
-		protected void SetResponseByBinding(object source) => this.SetResponseByBinding(source, MessageParameterDirection.Output);
+		protected void BindResponse(object source) => this.BindResponse(source, MessageParameterDirection.Output);
 		protected void SendNotification(long targetAuthenticatedId, long notificationType) => this.SendNotification(targetAuthenticatedId, notificationType, 0);
 		protected void SendNotification(long targetAuthenticatedId, long notificationType, long objectId) => this.GeneratedNotifications.Add(new Notification(targetAuthenticatedId, notificationType, objectId));
 
@@ -156,7 +156,7 @@ namespace ArkeIndustries.RequestServer {
 					this.Deserialize(reader, property, this);
 		}
 
-		protected void SetResponseByBinding(object source, MessageParameterDirection direction) {
+		protected void BindResponse(object source, MessageParameterDirection direction) {
 			if (source == null) throw new ArgumentNullException(nameof(source));
 
 			if (this.boundProperties == null)
@@ -321,7 +321,7 @@ namespace ArkeIndustries.RequestServer {
 			this.List = query.Provider.CreateQuery<TEntry>(call).Skip(this.Skip).Take(this.Take).ToList();
 		}
 
-		protected void SetResponseByBinding<T>(IQueryable<T> query) {
+		protected void BindResponseFromQuery<T>(IQueryable<T> query) {
 			if (query == null) throw new ArgumentNullException(nameof(query));
 
 			var result = new List<TEntry>();
