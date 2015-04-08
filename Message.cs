@@ -39,7 +39,7 @@ namespace ArkeIndustries.RequestServer {
 	}
 
 	public interface INotification : IDisposable {
-		MemoryStream Header { get; }
+		Stream Header { get; }
 
 		void SerializeHeader();
 	}
