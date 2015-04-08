@@ -85,7 +85,7 @@ namespace ArkeIndustries.RequestServer {
 
 		public virtual long Perform() => ResponseCode.Success;
 
-		protected void BindObjectToResponse(object source) => this.BindObjectToResponse(source, MessageParameterDirection.Output);
+		protected void SetResponseByBinding(object source) => this.SetResponseByBinding(source, MessageParameterDirection.Output);
 		protected void SendNotification(long targetAuthenticatedId, long notificationType) => this.SendNotification(targetAuthenticatedId, notificationType, 0);
 		protected void SendNotification(long targetAuthenticatedId, long notificationType, long objectId) => this.GeneratedNotifications.Add(new Notification(targetAuthenticatedId, notificationType, objectId));
 
@@ -156,7 +156,7 @@ namespace ArkeIndustries.RequestServer {
 					this.Deserialize(reader, property, this);
 		}
 
-		protected void BindObjectToResponse(object source, MessageParameterDirection direction) {
+		protected void SetResponseByBinding(object source, MessageParameterDirection direction) {
 			if (source == null) throw new ArgumentNullException(nameof(source));
 
 			if (this.boundProperties == null)
@@ -244,7 +244,7 @@ namespace ArkeIndustries.RequestServer {
 				}
 				else {
 					node.ListMemberSerializationDefinition.Serialize(writer, node, collection[i]);
-                }
+				}
 			}
 
 			collection.Clear();
@@ -278,72 +278,72 @@ namespace ArkeIndustries.RequestServer {
 	}
 
 	public abstract class MessageHandler<T> : MessageHandler where T : MessageContext {
-	public new T Context {
-		get {
-			return (T)base.Context;
-		}
-		set {
-			base.Context = value;
+		public new T Context {
+			get {
+				return (T)base.Context;
+			}
+			set {
+				base.Context = value;
+			}
 		}
 	}
-}
 
-public abstract class ListMessageHandler<TContext, TEntry> : MessageHandler<TContext> where TContext : MessageContext where TEntry : new() {
-	private List<BoundProperty> boundProperties;
+	public abstract class ListMessageHandler<TContext, TEntry> : MessageHandler<TContext> where TContext : MessageContext where TEntry : new() {
+		private List<BoundProperty> boundProperties;
 
-	[MessageParameter(-4, MessageParameterDirection.Input)]
-	[AtLeast(0)]
-	public int Skip { get; set; }
+		[MessageParameter(-4, MessageParameterDirection.Input)]
+		[AtLeast(0)]
+		public int Skip { get; set; }
 
-	[MessageParameter(-3, MessageParameterDirection.Input)]
-	[AtLeast(0)]
-	public int Take { get; set; }
+		[MessageParameter(-3, MessageParameterDirection.Input)]
+		[AtLeast(0)]
+		public int Take { get; set; }
 
-	[MessageParameter(-2, MessageParameterDirection.Input)]
-	[ApiString(false, 1)]
-	public string OrderByField { get; set; }
+		[MessageParameter(-2, MessageParameterDirection.Input)]
+		[ApiString(false, 1)]
+		public string OrderByField { get; set; }
 
-	[MessageParameter(-1, MessageParameterDirection.Input)]
-	public bool OrderByAscending { get; set; }
+		[MessageParameter(-1, MessageParameterDirection.Input)]
+		public bool OrderByAscending { get; set; }
 
-	[MessageParameter(-1, MessageParameterDirection.Output)]
-	public IReadOnlyList<TEntry> List { get; private set; }
+		[MessageParameter(-1, MessageParameterDirection.Output)]
+		public IReadOnlyList<TEntry> List { get; private set; }
 
-	protected void SetResponse(IQueryable<TEntry> query) {
-		if (query == null) throw new ArgumentNullException(nameof(query));
+		protected void SetResponseFromQuery(IQueryable<TEntry> query) {
+			if (query == null) throw new ArgumentNullException(nameof(query));
 
-		var parameter = Expression.Parameter(typeof(TEntry));
-		var property = Expression.Property(parameter, this.OrderByField);
-		var sort = Expression.Lambda(property, parameter);
-		var quote = Expression.Quote(sort);
-		var call = Expression.Call(typeof(Queryable), this.OrderByAscending ? "OrderBy" : "OrderByDescending", new[] { typeof(TEntry), property.Type }, query.Expression, quote);
+			var parameter = Expression.Parameter(typeof(TEntry));
+			var property = Expression.Property(parameter, this.OrderByField);
+			var sort = Expression.Lambda(property, parameter);
+			var quote = Expression.Quote(sort);
+			var call = Expression.Call(typeof(Queryable), this.OrderByAscending ? "OrderBy" : "OrderByDescending", new[] { typeof(TEntry), property.Type }, query.Expression, quote);
 
-		this.List = query.Provider.CreateQuery<TEntry>(call).Skip(this.Skip).Take(this.Take).ToList();
-	}
-
-	protected void BindListToResponse<T>(IQueryable<T> query) {
-		if (query == null) throw new ArgumentNullException(nameof(query));
-
-		var parameter = Expression.Parameter(typeof(T));
-		var property = Expression.Property(parameter, this.OrderByField);
-		var sort = Expression.Lambda(property, parameter);
-		var quote = Expression.Quote(sort);
-		var call = Expression.Call(typeof(Queryable), this.OrderByAscending ? "OrderBy" : "OrderByDescending", new[] { typeof(T), property.Type }, query.Expression, quote);
-
-		if (this.boundProperties == null)
-			this.boundProperties = MessageHandler.GetPropertiesToBind(typeof(T), this.CreateTree(MessageParameterDirection.Output, typeof(TEntry)));
-
-		var result = new List<TEntry>();
-		foreach (var sourceEntry in query.Provider.CreateQuery<T>(call).Skip(this.Skip).Take(this.Take)) {
-			var resultEntry = new TEntry();
-
-			foreach (var p in this.boundProperties)
-				p.Parameter.Property.SetValue(resultEntry, Convert.ChangeType(p.Property.GetValue(sourceEntry), p.Property.PropertyType, CultureInfo.InvariantCulture));
-
-			result.Add(resultEntry);
+			this.List = query.Provider.CreateQuery<TEntry>(call).Skip(this.Skip).Take(this.Take).ToList();
 		}
 
-		this.List = result;
+		protected void SetResponseByBinding<T>(IQueryable<T> query) {
+			if (query == null) throw new ArgumentNullException(nameof(query));
+
+			var result = new List<TEntry>();
+			var parameter = Expression.Parameter(typeof(T));
+			var property = Expression.Property(parameter, this.OrderByField);
+			var sort = Expression.Lambda(property, parameter);
+			var quote = Expression.Quote(sort);
+			var call = Expression.Call(typeof(Queryable), this.OrderByAscending ? "OrderBy" : "OrderByDescending", new[] { typeof(T), property.Type }, query.Expression, quote);
+
+			if (this.boundProperties == null)
+				this.boundProperties = MessageHandler.GetPropertiesToBind(typeof(T), this.CreateTree(MessageParameterDirection.Output, typeof(TEntry)));
+
+			foreach (var sourceEntry in query.Provider.CreateQuery<T>(call).Skip(this.Skip).Take(this.Take)) {
+				var resultEntry = new TEntry();
+
+				foreach (var p in this.boundProperties)
+					p.Parameter.Property.SetValue(resultEntry, Convert.ChangeType(p.Property.GetValue(sourceEntry), p.Property.PropertyType, CultureInfo.InvariantCulture));
+
+				result.Add(resultEntry);
+			}
+
+			this.List = result;
+		}
 	}
-}
 }
