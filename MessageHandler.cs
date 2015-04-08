@@ -42,7 +42,9 @@ namespace ArkeIndustries.RequestServer {
 	public abstract class MessageHandler {
 		internal class ParameterNode {
 			public PropertyInfo Property { get; set; }
-			public Type ListType { get; set; }
+			public Type ListGenericType { get; set; }
+			public ISerializationDefinition ListMemberSerializationDefinition { get; set; }
+			public ISerializationDefinition SerializationDefinition { get; set; }
 			public List<ParameterNode> Children { get; set; }
 		}
 
@@ -56,12 +58,12 @@ namespace ArkeIndustries.RequestServer {
 			public PropertyInfo Property { get; set; }
 		}
 
-		private interface ISerializationDefinition {
+		internal interface ISerializationDefinition {
 			void Serialize(BinaryWriter writer, ParameterNode node, object obj);
 			object Deserialize(BinaryReader reader, ParameterNode node);
 		}
 
-		private class SerializationDefinition<T> : ISerializationDefinition {
+		internal class SerializationDefinition<T> : ISerializationDefinition {
 			public Action<BinaryWriter, ParameterNode, T> Serializer { get; set; }
 			public Func<BinaryReader, ParameterNode, T> Deserializer { get; set; }
 
@@ -92,7 +94,8 @@ namespace ArkeIndustries.RequestServer {
 		protected MessageHandler() {
 			this.GeneratedNotifications = new List<Notification>();
 
-			this.serializationDefinitions = new Dictionary<Type, ISerializationDefinition>();
+			this.AddSerializationDefinitions();
+
 			this.inputProperties = this.CreateTree(MessageParameterDirection.Input);
 			this.outputProperties = this.CreateTree(MessageParameterDirection.Output);
 
@@ -100,25 +103,26 @@ namespace ArkeIndustries.RequestServer {
 				.Where(p => p.IsDefined(typeof(ValidationAttribute)))
 				.Select(p => new ValidationProperty() { Property = p, Attributes = p.GetCustomAttributes<ValidationAttribute>().ToList() })
 				.ToList();
-
-			this.AddSerializationDefinitions();
 		}
 
 		[SuppressMessage("Microsoft.Maintainability", "CA1502")]
 		private void AddSerializationDefinitions() {
-			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadString());
-			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadBoolean());
-			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadByte());
-			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadSByte());
-			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadUInt16());
-			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadInt16());
-			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadUInt32());
-			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadInt32());
-			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadUInt64());
-			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadInt64());
-			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadSingle());
-			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadDouble());
-			this.AddSerializationDefinition((r, p, o) => r.Write((ulong)((o - MessageHandler.DateTimeEpoch).TotalMilliseconds)), (w, p) => MessageHandler.DateTimeEpoch.AddMilliseconds(w.ReadUInt64()));
+			this.serializationDefinitions = new Dictionary<Type, ISerializationDefinition>();
+
+			this.AddSerializationDefinition((w, p, o) => w.Write(o), (r, p) => r.ReadString());
+			this.AddSerializationDefinition((w, p, o) => w.Write(o), (r, p) => r.ReadBoolean());
+			this.AddSerializationDefinition((w, p, o) => w.Write(o), (r, p) => r.ReadByte());
+			this.AddSerializationDefinition((w, p, o) => w.Write(o), (r, p) => r.ReadSByte());
+			this.AddSerializationDefinition((w, p, o) => w.Write(o), (r, p) => r.ReadUInt16());
+			this.AddSerializationDefinition((w, p, o) => w.Write(o), (r, p) => r.ReadInt16());
+			this.AddSerializationDefinition((w, p, o) => w.Write(o), (r, p) => r.ReadUInt32());
+			this.AddSerializationDefinition((w, p, o) => w.Write(o), (r, p) => r.ReadInt32());
+			this.AddSerializationDefinition((w, p, o) => w.Write(o), (r, p) => r.ReadUInt64());
+			this.AddSerializationDefinition((w, p, o) => w.Write(o), (r, p) => r.ReadInt64());
+			this.AddSerializationDefinition((w, p, o) => w.Write(o), (r, p) => r.ReadSingle());
+			this.AddSerializationDefinition((w, p, o) => w.Write(o), (r, p) => r.ReadDouble());
+			this.AddSerializationDefinition((w, p, o) => this.SerializeList(w, p, o), (r, p) => this.DeserializeList(r, p));
+			this.AddSerializationDefinition((w, p, o) => w.Write((ulong)((o - MessageHandler.DateTimeEpoch).TotalMilliseconds)), (r, p) => MessageHandler.DateTimeEpoch.AddMilliseconds(r.ReadUInt64()));
 		}
 
 		public long IsValid() {
@@ -188,16 +192,20 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		private ParameterNode CreateTree(MessageParameterDirection direction, PropertyInfo property) {
-			var node = new ParameterNode();
+			var node = new ParameterNode() { Property = property };
+			var iface = property.PropertyType.GetInterfaces().SingleOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IList<>));
 
-			if (property.PropertyType.GetInterfaces().Any(i => i == typeof(IList<>))) {
-				node.ListType = property.PropertyType.GenericTypeArguments.Single();
-				node.Property = property;
-				node.Children = MessageHandler.GetProperties(node.ListType, direction).Select(p => this.CreateTree(direction, p)).ToList();
+			if (iface != null) {
+				node.ListGenericType = iface.GenericTypeArguments.Single();
+				node.ListMemberSerializationDefinition = this.serializationDefinitions[node.ListGenericType];
+				node.SerializationDefinition = this.serializationDefinitions[typeof(IList)];
+				node.Children = MessageHandler.GetProperties(node.ListGenericType, direction).Select(p => this.CreateTree(direction, p)).ToList();
+			}
+			else if (property.PropertyType.IsEnum) {
+				node.SerializationDefinition = this.serializationDefinitions[Enum.GetUnderlyingType(node.Property.PropertyType)];
 			}
 			else {
-				node.ListType = null;
-				node.Property = property;
+				node.SerializationDefinition = this.serializationDefinitions[node.Property.PropertyType];
 				node.Children = MessageHandler.GetProperties(property.PropertyType, direction).Select(p => this.CreateTree(direction, p)).ToList();
 			}
 
@@ -205,21 +213,10 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		private void Serialize(BinaryWriter writer, ParameterNode node, object obj) {
-			ISerializationDefinition def;
-			object value = node.Property.GetValue(obj);
+			var value = node.Property.GetValue(obj);
 
-            if (!node.Property.PropertyType.IsEnum) {
-				this.serializationDefinitions.TryGetValue(node.Property.PropertyType, out def);
-			}
-			else {
-				this.serializationDefinitions.TryGetValue(Enum.GetUnderlyingType(node.Property.PropertyType), out def);
-			}
-
-			if (def != null) {
-				def.Serialize(writer, node, value);
-			}
-			else if (node.ListType != null) {
-				this.SerializeList(writer, node, value);
+			if (node.SerializationDefinition != null) {
+				node.SerializationDefinition.Serialize(writer, node, value);
 			}
 			else {
 				node.Children.ForEach(f => this.Serialize(writer, f, value));
@@ -227,52 +224,53 @@ namespace ArkeIndustries.RequestServer {
 		}
 
 		private void Deserialize(BinaryReader reader, ParameterNode node, object obj) {
-			ISerializationDefinition def;
-			
-			if (!node.Property.PropertyType.IsEnum) {
-				this.serializationDefinitions.TryGetValue(node.Property.PropertyType, out def);
-            } else {
-				this.serializationDefinitions.TryGetValue(Enum.GetUnderlyingType(node.Property.PropertyType), out def);
-			}
-
-			if (def != null) {
-				node.Property.SetValue(obj, def.Deserialize(reader, node));
-			}
-			else if (node.ListType != null) {
-				node.Property.SetValue(obj, this.DeserializeList(reader, node));
+			if (node.SerializationDefinition != null) {
+				node.Property.SetValue(obj, node.SerializationDefinition.Deserialize(reader, node));
 			}
 			else {
 				node.Children.ForEach(f => this.Deserialize(reader, f, node.Property.GetValue(obj)));
 			}
 		}
 
-		private void SerializeList(BinaryWriter writer, ParameterNode node, object obj) {
-			var child = node.Property.GetValue(obj);
-			var collection = (IList)child;
-
+		private void SerializeList(BinaryWriter writer, ParameterNode node, IList collection) {
 			writer.Write((ushort)collection.Count);
 
 			if (collection.Count == 0)
 				return;
 
-			for (var i = 0; i < collection.Count; i++)
-				node.Children.ForEach(f => this.Serialize(writer, f, collection[i]));
+			for (var i = 0; i < collection.Count; i++) {
+				if (node.Children.Any()) {
+					node.Children.ForEach(f => this.Serialize(writer, f, collection[i]));
+				}
+				else {
+					node.ListMemberSerializationDefinition.Serialize(writer, node, collection[i]);
+                }
+			}
 
 			collection.Clear();
 		}
 
-		private object DeserializeList(BinaryReader reader, ParameterNode node) {
-			var objectConstructor = node.ListType.GetConstructor(Type.EmptyTypes);
-			var collectionConstructor = node.Property.PropertyType.GetConstructor(Type.EmptyTypes);
-			var collection = (IList)collectionConstructor.Invoke(null);
+		private IList DeserializeList(BinaryReader reader, ParameterNode node) {
 			var count = reader.ReadUInt16();
+			var collectionConstructor = node.Property.PropertyType.GetConstructor(!node.Property.PropertyType.IsArray ? Type.EmptyTypes : new Type[] { typeof(int) });
+			var collection = (IList)collectionConstructor.Invoke(!node.Property.PropertyType.IsArray ? null : new object[] { count });
+			var adder = !node.Property.PropertyType.IsArray ? (Action<object, int>)((o, i) => collection.Add(o)) : (o, i) => collection[i] = o;
 
-			for (var i = 0; i < count; i++) {
-				var newObject = objectConstructor.Invoke(null);
+			if (node.Children.Any()) {
+				var objectConstructor = node.ListGenericType.GetConstructor(Type.EmptyTypes);
 
-				node.Children.ForEach(f => this.Deserialize(reader, f, newObject));
+				for (var i = 0; i < count; i++) {
+					var newObject = objectConstructor.Invoke(null);
 
-				collection.Add(newObject);
+					node.Children.ForEach(f => this.Deserialize(reader, f, newObject));
+
+					adder(newObject, i);
+				}
+			}
+			else {
+				for (var i = 0; i < count; i++) {
+					adder(node.ListMemberSerializationDefinition.Deserialize(reader, node), i);
+				}
 			}
 
 			return collection;
@@ -280,72 +278,72 @@ namespace ArkeIndustries.RequestServer {
 	}
 
 	public abstract class MessageHandler<T> : MessageHandler where T : MessageContext {
-		public new T Context {
-			get {
-				return (T)base.Context;
-			}
-			set {
-				base.Context = value;
-			}
+	public new T Context {
+		get {
+			return (T)base.Context;
+		}
+		set {
+			base.Context = value;
 		}
 	}
+}
 
-	public abstract class ListMessageHandler<TContext, TEntry> : MessageHandler<TContext> where TContext : MessageContext where TEntry : new() {
-		private List<BoundProperty> boundProperties;
+public abstract class ListMessageHandler<TContext, TEntry> : MessageHandler<TContext> where TContext : MessageContext where TEntry : new() {
+	private List<BoundProperty> boundProperties;
 
-		[MessageParameter(-4, MessageParameterDirection.Input)]
-		[AtLeast(0)]
-		public int Skip { get; set; }
+	[MessageParameter(-4, MessageParameterDirection.Input)]
+	[AtLeast(0)]
+	public int Skip { get; set; }
 
-		[MessageParameter(-3, MessageParameterDirection.Input)]
-		[AtLeast(0)]
-		public int Take { get; set; }
+	[MessageParameter(-3, MessageParameterDirection.Input)]
+	[AtLeast(0)]
+	public int Take { get; set; }
 
-		[MessageParameter(-2, MessageParameterDirection.Input)]
-		[ApiString(false, 1)]
-		public string OrderByField { get; set; }
+	[MessageParameter(-2, MessageParameterDirection.Input)]
+	[ApiString(false, 1)]
+	public string OrderByField { get; set; }
 
-		[MessageParameter(-1, MessageParameterDirection.Input)]
-		public bool OrderByAscending { get; set; }
+	[MessageParameter(-1, MessageParameterDirection.Input)]
+	public bool OrderByAscending { get; set; }
 
-		[MessageParameter(-1, MessageParameterDirection.Output)]
-		public IReadOnlyList<TEntry> List { get; private set; }
+	[MessageParameter(-1, MessageParameterDirection.Output)]
+	public IReadOnlyList<TEntry> List { get; private set; }
 
-		protected void SetResponse(IQueryable<TEntry> query) {
-			if (query == null) throw new ArgumentNullException(nameof(query));
+	protected void SetResponse(IQueryable<TEntry> query) {
+		if (query == null) throw new ArgumentNullException(nameof(query));
 
-			var parameter = Expression.Parameter(typeof(TEntry));
-			var property = Expression.Property(parameter, this.OrderByField);
-			var sort = Expression.Lambda(property, parameter);
-			var quote = Expression.Quote(sort);
-			var call = Expression.Call(typeof(Queryable), this.OrderByAscending ? "OrderBy" : "OrderByDescending", new[] { typeof(TEntry), property.Type }, query.Expression, quote);
+		var parameter = Expression.Parameter(typeof(TEntry));
+		var property = Expression.Property(parameter, this.OrderByField);
+		var sort = Expression.Lambda(property, parameter);
+		var quote = Expression.Quote(sort);
+		var call = Expression.Call(typeof(Queryable), this.OrderByAscending ? "OrderBy" : "OrderByDescending", new[] { typeof(TEntry), property.Type }, query.Expression, quote);
 
-			this.List = query.Provider.CreateQuery<TEntry>(call).Skip(this.Skip).Take(this.Take).ToList();
-		}
-
-		protected void BindListToResponse<T>(IQueryable<T> query) {
-			if (query == null) throw new ArgumentNullException(nameof(query));
-
-			var parameter = Expression.Parameter(typeof(T));
-			var property = Expression.Property(parameter, this.OrderByField);
-			var sort = Expression.Lambda(property, parameter);
-			var quote = Expression.Quote(sort);
-			var call = Expression.Call(typeof(Queryable), this.OrderByAscending ? "OrderBy" : "OrderByDescending", new[] { typeof(T), property.Type }, query.Expression, quote);
-
-			if (this.boundProperties == null)
-				this.boundProperties = MessageHandler.GetPropertiesToBind(typeof(T), this.CreateTree(MessageParameterDirection.Output, typeof(TEntry)));
-
-			var result = new List<TEntry>();
-			foreach (var sourceEntry in query.Provider.CreateQuery<T>(call).Skip(this.Skip).Take(this.Take)) {
-				var resultEntry = new TEntry();
-
-				foreach (var p in this.boundProperties)
-					p.Parameter.Property.SetValue(resultEntry, Convert.ChangeType(p.Property.GetValue(sourceEntry), p.Property.PropertyType, CultureInfo.InvariantCulture));
-
-				result.Add(resultEntry);
-			}
-
-			this.List = result;
-		}
+		this.List = query.Provider.CreateQuery<TEntry>(call).Skip(this.Skip).Take(this.Take).ToList();
 	}
+
+	protected void BindListToResponse<T>(IQueryable<T> query) {
+		if (query == null) throw new ArgumentNullException(nameof(query));
+
+		var parameter = Expression.Parameter(typeof(T));
+		var property = Expression.Property(parameter, this.OrderByField);
+		var sort = Expression.Lambda(property, parameter);
+		var quote = Expression.Quote(sort);
+		var call = Expression.Call(typeof(Queryable), this.OrderByAscending ? "OrderBy" : "OrderByDescending", new[] { typeof(T), property.Type }, query.Expression, quote);
+
+		if (this.boundProperties == null)
+			this.boundProperties = MessageHandler.GetPropertiesToBind(typeof(T), this.CreateTree(MessageParameterDirection.Output, typeof(TEntry)));
+
+		var result = new List<TEntry>();
+		foreach (var sourceEntry in query.Provider.CreateQuery<T>(call).Skip(this.Skip).Take(this.Take)) {
+			var resultEntry = new TEntry();
+
+			foreach (var p in this.boundProperties)
+				p.Parameter.Property.SetValue(resultEntry, Convert.ChangeType(p.Property.GetValue(sourceEntry), p.Property.PropertyType, CultureInfo.InvariantCulture));
+
+			result.Add(resultEntry);
+		}
+
+		this.List = result;
+	}
+}
 }
