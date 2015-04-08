@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Text;
 
 namespace ArkeIndustries.RequestServer {
 	public enum MessageParameterDirection {
@@ -115,6 +116,8 @@ namespace ArkeIndustries.RequestServer {
 			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadInt32());
 			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadUInt64());
 			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadInt64());
+			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadSingle());
+			this.AddSerializationDefinition((r, p, o) => r.Write(o), (w, p) => w.ReadDouble());
 			this.AddSerializationDefinition((r, p, o) => r.Write((ulong)((o - MessageHandler.DateTimeEpoch).TotalMilliseconds)), (w, p) => MessageHandler.DateTimeEpoch.AddMilliseconds(w.ReadUInt64()));
 		}
 
@@ -136,7 +139,7 @@ namespace ArkeIndustries.RequestServer {
 		public void Serialize(MessageParameterDirection direction, Stream stream) {
 			if (stream == null) throw new ArgumentNullException(nameof(stream));
 
-			using (var writer = new BinaryWriter(stream))
+			using (var writer = new BinaryWriter(stream, Encoding.UTF8, true))
 				foreach (var property in direction == MessageParameterDirection.Input ? this.inputProperties : this.outputProperties)
 					this.Serialize(writer, property, this);
 		}
@@ -144,7 +147,7 @@ namespace ArkeIndustries.RequestServer {
 		public void Deserialize(MessageParameterDirection direction, Stream stream) {
 			if (stream == null) throw new ArgumentNullException(nameof(stream));
 
-			using (var reader = new BinaryReader(stream))
+			using (var reader = new BinaryReader(stream, Encoding.UTF8, true))
 				foreach (var property in direction == MessageParameterDirection.Input ? this.inputProperties : this.outputProperties)
 					this.Deserialize(reader, property, this);
 		}
@@ -187,15 +190,15 @@ namespace ArkeIndustries.RequestServer {
 		private ParameterNode CreateTree(MessageParameterDirection direction, PropertyInfo property) {
 			var node = new ParameterNode();
 
-			if (!property.PropertyType.GetInterfaces().Any(i => i == typeof(IList<>))) {
-				node.ListType = null;
-				node.Property = property;
-				node.Children = MessageHandler.GetProperties(property.PropertyType, direction).Select(p => this.CreateTree(direction, p)).ToList();
-			}
-			else {
+			if (property.PropertyType.GetInterfaces().Any(i => i == typeof(IList<>))) {
 				node.ListType = property.PropertyType.GenericTypeArguments.Single();
 				node.Property = property;
 				node.Children = MessageHandler.GetProperties(node.ListType, direction).Select(p => this.CreateTree(direction, p)).ToList();
+			}
+			else {
+				node.ListType = null;
+				node.Property = property;
+				node.Children = MessageHandler.GetProperties(property.PropertyType, direction).Select(p => this.CreateTree(direction, p)).ToList();
 			}
 
 			return node;
@@ -203,22 +206,36 @@ namespace ArkeIndustries.RequestServer {
 
 		private void Serialize(BinaryWriter writer, ParameterNode node, object obj) {
 			ISerializationDefinition def;
+			object value = node.Property.GetValue(obj);
 
-			if (this.serializationDefinitions.TryGetValue(node.Property.PropertyType, out def)) {
-				def.Serialize(writer, node, obj);
-			}
-			else if (node.ListType != null) {
-				this.SerializeList(writer, node, obj);
+            if (!node.Property.PropertyType.IsEnum) {
+				this.serializationDefinitions.TryGetValue(node.Property.PropertyType, out def);
 			}
 			else {
-				node.Children.ForEach(f => this.Serialize(writer, f, node.Property.GetValue(obj)));
+				this.serializationDefinitions.TryGetValue(Enum.GetUnderlyingType(node.Property.PropertyType), out def);
+			}
+
+			if (def != null) {
+				def.Serialize(writer, node, value);
+			}
+			else if (node.ListType != null) {
+				this.SerializeList(writer, node, value);
+			}
+			else {
+				node.Children.ForEach(f => this.Serialize(writer, f, value));
 			}
 		}
 
 		private void Deserialize(BinaryReader reader, ParameterNode node, object obj) {
 			ISerializationDefinition def;
-				
-			if (this.serializationDefinitions.TryGetValue(node.Property.PropertyType, out def)) {
+			
+			if (!node.Property.PropertyType.IsEnum) {
+				this.serializationDefinitions.TryGetValue(node.Property.PropertyType, out def);
+            } else {
+				this.serializationDefinitions.TryGetValue(Enum.GetUnderlyingType(node.Property.PropertyType), out def);
+			}
+
+			if (def != null) {
 				node.Property.SetValue(obj, def.Deserialize(reader, node));
 			}
 			else if (node.ListType != null) {
