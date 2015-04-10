@@ -9,6 +9,7 @@
 		public static long AuthenticationFailed => 6;
 		public static long TryAgainLater => 7;
 		public static long ConcurrencyFailure => 8;
+		public static long ObjectNotFound => 9;
 	}
 
 	public static class NotificationCode {

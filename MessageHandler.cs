@@ -85,7 +85,7 @@ namespace ArkeIndustries.RequestServer {
 
 		public virtual long Perform() => ResponseCode.Success;
 
-		protected void BindResponse(object source) => this.BindResponse(source, MessageParameterDirection.Output);
+		protected long BindResponse(object source) => this.BindResponse(source, MessageParameterDirection.Output);
 		protected void SendNotification(long targetAuthenticatedId, long notificationType) => this.SendNotification(targetAuthenticatedId, notificationType, 0);
 		protected void SendNotification(long targetAuthenticatedId, long notificationType, long objectId) => this.GeneratedNotifications.Add(new Notification(targetAuthenticatedId, notificationType, objectId));
 
@@ -156,14 +156,17 @@ namespace ArkeIndustries.RequestServer {
 					this.Deserialize(reader, property, this);
 		}
 
-		protected void BindResponse(object source, MessageParameterDirection direction) {
-			if (source == null) throw new ArgumentNullException(nameof(source));
+		protected long BindResponse(object source, MessageParameterDirection direction) {
+			if (source == null)
+				return ResponseCode.ObjectNotFound;
 
 			if (this.boundProperties == null)
 				this.boundProperties = MessageHandler.GetPropertiesToBind(source.GetType(), direction == MessageParameterDirection.Input ? this.inputProperties : this.outputProperties);
 
 			foreach (var p in this.boundProperties)
 				p.Parameter.Property.SetValue(this, Convert.ChangeType(p.Property.GetValue(source), p.Property.PropertyType, CultureInfo.InvariantCulture));
+
+			return ResponseCode.Success;
 		}
 
 		internal static List<BoundProperty> GetPropertiesToBind(Type type, List<ParameterNode> targetProperties) {
@@ -309,7 +312,7 @@ namespace ArkeIndustries.RequestServer {
 		[MessageParameter(-1, MessageParameterDirection.Output)]
 		public IReadOnlyList<TEntry> List { get; private set; }
 
-		protected void SetResponseFromQuery(IQueryable<TEntry> query) {
+		protected long SetResponseFromQuery(IQueryable<TEntry> query) {
 			if (query == null) throw new ArgumentNullException(nameof(query));
 
 			var parameter = Expression.Parameter(typeof(TEntry));
@@ -319,9 +322,11 @@ namespace ArkeIndustries.RequestServer {
 			var call = Expression.Call(typeof(Queryable), this.OrderByAscending ? "OrderBy" : "OrderByDescending", new[] { typeof(TEntry), property.Type }, query.Expression, quote);
 
 			this.List = query.Provider.CreateQuery<TEntry>(call).Skip(this.Skip).Take(this.Take).ToList();
+
+			return ResponseCode.Success;
 		}
 
-		protected void BindResponseFromQuery<T>(IQueryable<T> query) {
+		protected long BindResponseFromQuery<T>(IQueryable<T> query) {
 			if (query == null) throw new ArgumentNullException(nameof(query));
 
 			var result = new List<TEntry>();
@@ -344,6 +349,8 @@ namespace ArkeIndustries.RequestServer {
 			}
 
 			this.List = result;
+
+			return ResponseCode.Success;
 		}
 	}
 }
