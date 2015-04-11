@@ -31,11 +31,9 @@ namespace ArkeIndustries.RequestServer {
 	[AttributeUsage(AttributeTargets.Property)]
 	public sealed class MessageParameterAttribute : Attribute {
 		public long Index { get; }
-		public MessageParameterDirection Direction { get; }
 
-		public MessageParameterAttribute(long index, MessageParameterDirection direction) {
+		public MessageParameterAttribute(long index) {
 			this.Index = index;
-			this.Direction = direction;
 		}
 	}
 
@@ -80,6 +78,8 @@ namespace ArkeIndustries.RequestServer {
 		private Dictionary<Type, ISerializationDefinition> serializationDefinitions;
 
 		public MessageContext Context { get; set; }
+		public object Request { get; set; }
+		public object Response { get; set; }
 
 		internal List<Notification> GeneratedNotifications { get; private set; }
 
@@ -91,13 +91,16 @@ namespace ArkeIndustries.RequestServer {
 
 		private void AddSerializationDefinition<T>(Action<BinaryWriter, ParameterNode, T> serializer, Func<BinaryReader, ParameterNode, T> deserializer) => this.serializationDefinitions.Add(typeof(T), new SerializationDefinition<T> { Serializer = serializer, Deserializer = deserializer });
 
-		protected MessageHandler() {
+		protected MessageHandler(object request, object response) {
+			this.Request = request;
+			this.Response = response;
+
 			this.GeneratedNotifications = new List<Notification>();
 
 			this.AddSerializationDefinitions();
 
-			this.inputProperties = this.CreateTree(MessageParameterDirection.Input);
-			this.outputProperties = this.CreateTree(MessageParameterDirection.Output);
+			this.inputProperties = this.CreateTree(this.Request.GetType());
+			this.outputProperties = this.CreateTree(this.Response.GetType());
 
 			this.validationProperties = this.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance)
 				.Where(p => p.IsDefined(typeof(ValidationAttribute)))
@@ -178,23 +181,18 @@ namespace ArkeIndustries.RequestServer {
 				.ToList();
 		}
 
-		internal static List<PropertyInfo> GetProperties(Type type, MessageParameterDirection direction) {
+		internal static List<PropertyInfo> GetProperties(Type type) {
 			return type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
 				.Where(p => p.IsDefined(typeof(MessageParameterAttribute)))
-				.Where(p => p.GetCustomAttribute<MessageParameterAttribute>().Direction == direction)
 				.OrderBy(p => p.GetCustomAttribute<MessageParameterAttribute>().Index)
 				.ToList();
 		}
 
-		private List<ParameterNode> CreateTree(MessageParameterDirection direction) {
-			return this.CreateTree(direction, this.GetType());
+		internal List<ParameterNode> CreateTree(Type type) {
+			return MessageHandler.GetProperties(type).Select(p => this.CreateTree(p)).ToList();
 		}
 
-		internal List<ParameterNode> CreateTree(MessageParameterDirection direction, Type type) {
-			return MessageHandler.GetProperties(type, direction).Select(p => this.CreateTree(direction, p)).ToList();
-		}
-
-		private ParameterNode CreateTree(MessageParameterDirection direction, PropertyInfo property) {
+		private ParameterNode CreateTree(PropertyInfo property) {
 			var node = new ParameterNode() { Property = property };
 			var iface = property.PropertyType.GetInterfaces().SingleOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IList<>));
 
@@ -202,14 +200,14 @@ namespace ArkeIndustries.RequestServer {
 				node.ListGenericType = iface.GenericTypeArguments.Single();
 				node.ListMemberSerializationDefinition = this.serializationDefinitions[node.ListGenericType];
 				node.SerializationDefinition = this.serializationDefinitions[typeof(IList)];
-				node.Children = MessageHandler.GetProperties(node.ListGenericType, direction).Select(p => this.CreateTree(direction, p)).ToList();
+				node.Children = MessageHandler.GetProperties(node.ListGenericType).Select(p => this.CreateTree(p)).ToList();
 			}
 			else if (property.PropertyType.IsEnum) {
 				node.SerializationDefinition = this.serializationDefinitions[Enum.GetUnderlyingType(node.Property.PropertyType)];
 			}
 			else {
 				node.SerializationDefinition = this.serializationDefinitions[node.Property.PropertyType];
-				node.Children = MessageHandler.GetProperties(property.PropertyType, direction).Select(p => this.CreateTree(direction, p)).ToList();
+				node.Children = MessageHandler.GetProperties(property.PropertyType).Select(p => this.CreateTree(p)).ToList();
 			}
 
 			return node;
@@ -280,48 +278,76 @@ namespace ArkeIndustries.RequestServer {
 		}
 	}
 
-	public abstract class MessageHandler<T> : MessageHandler where T : MessageContext {
-		public new T Context {
+	[SuppressMessage("Microsoft.Design", "CA1005")]
+	public abstract class MessageHandler<TContext, TRequest, TResponse> : MessageHandler where TContext : MessageContext where TRequest : new() where TResponse : new() {
+		protected MessageHandler() : base(new TRequest(), new TResponse()) {
+
+		}
+
+		public new TContext Context {
 			get {
-				return (T)base.Context;
+				return (TContext)base.Context;
 			}
 			set {
 				base.Context = value;
 			}
 		}
+
+		public new TRequest Request {
+			get {
+				return (TRequest)base.Request;
+			}
+			set {
+				base.Request = value;
+			}
+		}
+
+		public new TResponse Response {
+			get {
+				return (TResponse)base.Response;
+			}
+			set {
+				base.Response = value;
+			}
+		}
 	}
 
-	public abstract class ListMessageHandler<TContext, TEntry> : MessageHandler<TContext> where TContext : MessageContext where TEntry : new() {
-		private List<BoundProperty> boundProperties;
-
-		[MessageParameter(-4, MessageParameterDirection.Input)]
+	public class ListInput {
+		[MessageParameter(-4)]
 		[AtLeast(0)]
 		public int Skip { get; set; }
 
-		[MessageParameter(-3, MessageParameterDirection.Input)]
+		[MessageParameter(-3)]
 		[AtLeast(0)]
 		public int Take { get; set; }
 
-		[MessageParameter(-2, MessageParameterDirection.Input)]
+		[MessageParameter(-2)]
 		[ApiString(false, 1)]
 		public string OrderByField { get; set; }
 
-		[MessageParameter(-1, MessageParameterDirection.Input)]
+		[MessageParameter(-1)]
 		public bool OrderByAscending { get; set; }
+	}
 
-		[MessageParameter(-1, MessageParameterDirection.Output)]
-		public IReadOnlyList<TEntry> List { get; private set; }
+	public class ListOutput<TEntry> where TEntry : new() {
+		[MessageParameter(-1)]
+		public IReadOnlyList<TEntry> List { get; set; }
+	}
+
+	[SuppressMessage("Microsoft.Design", "CA1005")]
+	public abstract class ListMessageHandler<TContext, TRequest, TResponse, TEntry> : MessageHandler<TContext, TRequest, TResponse> where TContext : MessageContext where TEntry : new() where TRequest : ListInput, new() where TResponse : ListOutput<TEntry>, new() {
+		private List<BoundProperty> boundProperties;
 
 		protected long SetResponseFromQuery(IQueryable<TEntry> query) {
 			if (query == null) throw new ArgumentNullException(nameof(query));
 
 			var parameter = Expression.Parameter(typeof(TEntry));
-			var property = Expression.Property(parameter, this.OrderByField);
+			var property = Expression.Property(parameter, this.Request.OrderByField);
 			var sort = Expression.Lambda(property, parameter);
 			var quote = Expression.Quote(sort);
-			var call = Expression.Call(typeof(Queryable), this.OrderByAscending ? "OrderBy" : "OrderByDescending", new[] { typeof(TEntry), property.Type }, query.Expression, quote);
+			var call = Expression.Call(typeof(Queryable), this.Request.OrderByAscending ? "OrderBy" : "OrderByDescending", new[] { typeof(TEntry), property.Type }, query.Expression, quote);
 
-			this.List = query.Provider.CreateQuery<TEntry>(call).Skip(this.Skip).Take(this.Take).ToList();
+			this.Response.List = query.Provider.CreateQuery<TEntry>(call).Skip(this.Request.Skip).Take(this.Request.Take).ToList();
 
 			return ResponseCode.Success;
 		}
@@ -331,15 +357,15 @@ namespace ArkeIndustries.RequestServer {
 
 			var result = new List<TEntry>();
 			var parameter = Expression.Parameter(typeof(T));
-			var property = Expression.Property(parameter, this.OrderByField);
+			var property = Expression.Property(parameter, this.Request.OrderByField);
 			var sort = Expression.Lambda(property, parameter);
 			var quote = Expression.Quote(sort);
-			var call = Expression.Call(typeof(Queryable), this.OrderByAscending ? "OrderBy" : "OrderByDescending", new[] { typeof(T), property.Type }, query.Expression, quote);
+			var call = Expression.Call(typeof(Queryable), this.Request.OrderByAscending ? "OrderBy" : "OrderByDescending", new[] { typeof(T), property.Type }, query.Expression, quote);
 
 			if (this.boundProperties == null)
-				this.boundProperties = MessageHandler.GetPropertiesToBind(typeof(T), this.CreateTree(MessageParameterDirection.Output, typeof(TEntry)));
+				this.boundProperties = MessageHandler.GetPropertiesToBind(typeof(T), this.CreateTree(typeof(TEntry)));
 
-			foreach (var sourceEntry in query.Provider.CreateQuery<T>(call).Skip(this.Skip).Take(this.Take)) {
+			foreach (var sourceEntry in query.Provider.CreateQuery<T>(call).Skip(this.Request.Skip).Take(this.Request.Take)) {
 				var resultEntry = new TEntry();
 
 				foreach (var p in this.boundProperties)
@@ -348,7 +374,7 @@ namespace ArkeIndustries.RequestServer {
 				result.Add(resultEntry);
 			}
 
-			this.List = result;
+			this.Response.List = result;
 
 			return ResponseCode.Success;
 		}
