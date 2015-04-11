@@ -196,11 +196,16 @@ namespace ArkeIndustries.RequestServer {
 			var node = new ParameterNode() { Property = property };
 			var iface = property.PropertyType.GetInterfaces().SingleOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IList<>));
 
+			if (property.PropertyType.IsGenericType && property.PropertyType.GetGenericTypeDefinition() == typeof(IList<>))
+				iface = property.PropertyType;
+
 			if (iface != null) {
 				node.ListGenericType = iface.GenericTypeArguments.Single();
-				node.ListMemberSerializationDefinition = this.serializationDefinitions[node.ListGenericType];
 				node.SerializationDefinition = this.serializationDefinitions[typeof(IList)];
 				node.Children = MessageHandler.GetProperties(node.ListGenericType).Select(p => this.CreateTree(p)).ToList();
+
+				if (!node.Children.Any())
+					node.ListMemberSerializationDefinition = this.serializationDefinitions[node.ListGenericType];
 			}
 			else if (property.PropertyType.IsEnum) {
 				node.SerializationDefinition = this.serializationDefinitions[Enum.GetUnderlyingType(node.Property.PropertyType)];
@@ -331,7 +336,7 @@ namespace ArkeIndustries.RequestServer {
 
 	public class ListOutput<TEntry> where TEntry : new() {
 		[MessageParameter(-1)]
-		public IReadOnlyList<TEntry> List { get; set; }
+		public IList<TEntry> List { get; internal set; }
 	}
 
 	[SuppressMessage("Microsoft.Design", "CA1005")]
