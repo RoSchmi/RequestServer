@@ -113,12 +113,18 @@ namespace ArkeIndustries.RequestServer {
 	public sealed class InEnumAttribute : BasicValidationAttribute {
 		public Type EnumType { get; }
 
+		public InEnumAttribute() {
+			this.EnumType = null;
+		}
+
 		public InEnumAttribute(Type enumType) {
 			this.EnumType = enumType;
 		}
 
 		protected override bool IsBasicValid(object value) {
-			return Enum.IsDefined(this.EnumType, value);
+			if (value == null) throw new ArgumentNullException(nameof(value));
+
+			return Enum.IsDefined(this.EnumType ?? value.GetType(), value);
 		}
 	}
 }
