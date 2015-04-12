@@ -102,7 +102,7 @@ namespace ArkeIndustries.RequestServer {
 			this.inputProperties = this.CreateTree(this.Request.GetType());
 			this.outputProperties = this.CreateTree(this.Response.GetType());
 
-			this.validationProperties = this.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance)
+			this.validationProperties = this.Request.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance)
 				.Where(p => p.IsDefined(typeof(ValidationAttribute)))
 				.Select(p => new ValidationProperty() { Property = p, Attributes = p.GetCustomAttributes<ValidationAttribute>().ToList() })
 				.ToList();
