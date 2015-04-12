@@ -71,13 +71,13 @@ namespace ArkeIndustries.RequestServer {
 				this.disposed = false;
 			}
 
-			protected override async Task<long> Send(byte[] buffer, long offset, long count) {
-				await this.client.SendAsync(new ArraySegment<byte>(buffer, (int)offset, (int)count), WebSocketMessageType.Binary, true, CancellationToken.None);
+			protected override async Task<long> Send(byte[] buffer, long offset, long count, bool isEndOfMessage) {
+				await this.client.SendAsync(new ArraySegment<byte>(buffer, (int)offset, (int)count), WebSocketMessageType.Binary, isEndOfMessage, CancellationToken.None);
 
 				return count;
 			}
 
-			protected override async Task<long> Receive(byte[] buffer, long offset, long count) {
+			protected override async Task<long> Receive(byte[] buffer, long offset, long count, bool isEndOfMessage) {
 				try {
 					var result = await this.client.ReceiveAsync(new ArraySegment<byte>(buffer, (int)offset, (int)count), CancellationToken.None);
 

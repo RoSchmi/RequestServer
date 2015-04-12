@@ -11,8 +11,8 @@ using System.Text;
 
 namespace ArkeIndustries.RequestServer {
 	public enum MessageParameterDirection {
-		Input,
-		Output
+		Request,
+		Response
 	}
 
 	[AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
@@ -85,7 +85,7 @@ namespace ArkeIndustries.RequestServer {
 
 		public virtual long Perform() => ResponseCode.Success;
 
-		protected long BindResponse(object source) => this.BindResponse(source, MessageParameterDirection.Output);
+		protected long BindResponse(object source) => this.BindResponse(source, MessageParameterDirection.Response);
 		protected void SendNotification(long targetAuthenticatedId, long notificationType) => this.SendNotification(targetAuthenticatedId, notificationType, 0);
 		protected void SendNotification(long targetAuthenticatedId, long notificationType, long objectId) => this.GeneratedNotifications.Add(new Notification(targetAuthenticatedId, notificationType, objectId));
 
@@ -147,16 +147,16 @@ namespace ArkeIndustries.RequestServer {
 			if (stream == null) throw new ArgumentNullException(nameof(stream));
 
 			using (var writer = new BinaryWriter(stream, Encoding.UTF8, true))
-				foreach (var property in direction == MessageParameterDirection.Input ? this.inputProperties : this.outputProperties)
-					this.Serialize(writer, property, this);
+				foreach (var property in direction == MessageParameterDirection.Request ? this.inputProperties : this.outputProperties)
+					this.Serialize(writer, property, direction == MessageParameterDirection.Request ? this.Request : this.Response);
 		}
 
 		public void Deserialize(MessageParameterDirection direction, Stream stream) {
 			if (stream == null) throw new ArgumentNullException(nameof(stream));
 
 			using (var reader = new BinaryReader(stream, Encoding.UTF8, true))
-				foreach (var property in direction == MessageParameterDirection.Input ? this.inputProperties : this.outputProperties)
-					this.Deserialize(reader, property, this);
+				foreach (var property in direction == MessageParameterDirection.Request ? this.inputProperties : this.outputProperties)
+					this.Deserialize(reader, property, direction == MessageParameterDirection.Request ? this.Request : this.Response);
 		}
 
 		protected long BindResponse(object source, MessageParameterDirection direction) {
@@ -164,7 +164,7 @@ namespace ArkeIndustries.RequestServer {
 				return ResponseCode.ObjectNotFound;
 
 			if (this.boundProperties == null)
-				this.boundProperties = MessageHandler.GetPropertiesToBind(source.GetType(), direction == MessageParameterDirection.Input ? this.inputProperties : this.outputProperties);
+				this.boundProperties = MessageHandler.GetPropertiesToBind(source.GetType(), direction == MessageParameterDirection.Request ? this.inputProperties : this.outputProperties);
 
 			foreach (var p in this.boundProperties)
 				p.Parameter.Property.SetValue(this, Convert.ChangeType(p.Property.GetValue(source), p.Property.PropertyType, CultureInfo.InvariantCulture));
@@ -323,11 +323,11 @@ namespace ArkeIndustries.RequestServer {
 		public int Skip { get; set; }
 
 		[MessageParameter(-3)]
-		[AtLeast(0)]
+		[AtLeast(1)]
 		public int Take { get; set; }
 
 		[MessageParameter(-2)]
-		[ApiString(false, 1)]
+		[ApiString(false, 0)]
 		public string OrderByField { get; set; }
 
 		[MessageParameter(-1)]
@@ -346,13 +346,18 @@ namespace ArkeIndustries.RequestServer {
 		protected long SetResponseFromQuery(IQueryable<TEntry> query) {
 			if (query == null) throw new ArgumentNullException(nameof(query));
 
-			var parameter = Expression.Parameter(typeof(TEntry));
-			var property = Expression.Property(parameter, this.Request.OrderByField);
-			var sort = Expression.Lambda(property, parameter);
-			var quote = Expression.Quote(sort);
-			var call = Expression.Call(typeof(Queryable), this.Request.OrderByAscending ? "OrderBy" : "OrderByDescending", new[] { typeof(TEntry), property.Type }, query.Expression, quote);
+			try {
+				var parameter = Expression.Parameter(typeof(TEntry));
+				var property = Expression.Property(parameter, this.Request.OrderByField);
+				var sort = Expression.Lambda(property, parameter);
+				var quote = Expression.Quote(sort);
+				var call = Expression.Call(typeof(Queryable), this.Request.OrderByAscending ? "OrderBy" : "OrderByDescending", new[] { typeof(TEntry), property.Type }, query.Expression, quote);
 
-			this.Response.List = query.Provider.CreateQuery<TEntry>(call).Skip(this.Request.Skip).Take(this.Request.Take).ToList();
+				this.Response.List = query.Provider.CreateQuery<TEntry>(call).Skip(this.Request.Skip).Take(this.Request.Take).ToList();
+			}
+			catch (ArgumentException) {
+				this.Response.List = query.ToList();
+			}
 
 			return ResponseCode.Success;
 		}

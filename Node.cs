@@ -197,7 +197,7 @@ namespace ArkeIndustries.RequestServer {
 							}
 
 							try {
-								def.Handler.Deserialize(MessageParameterDirection.Input, request.Body);
+								def.Handler.Deserialize(MessageParameterDirection.Request, request.Body);
 
 								var valid = def.Handler.IsValid();
 
@@ -240,7 +240,7 @@ namespace ArkeIndustries.RequestServer {
 							this.Context?.EndMessage();
 
 							if (response.ResponseCode == ResponseCode.Success)
-								def.Handler.Serialize(MessageParameterDirection.Output, responseStream);
+								def.Handler.Serialize(MessageParameterDirection.Response, responseStream);
 
 							foreach (var n in def.Handler.GeneratedNotifications)
 								this.notifications.Add(n);
@@ -260,8 +260,8 @@ namespace ArkeIndustries.RequestServer {
 					response.BodyLength = responseStream.Position;
 					response.SerializeHeader();
 
-					responseStream.CopyTo(response.Body);
 					responseStream.Seek(0, SeekOrigin.Begin);
+					responseStream.CopyTo(response.Body);
 					responseStream.SetLength(0);
 
 					request.Dispose();

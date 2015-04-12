@@ -64,13 +64,13 @@ namespace ArkeIndustries.RequestServer {
 				this.disposed = false;
 			}
 
-			protected override async Task<long> Send(byte[] buffer, long offset, long count) {
+			protected override async Task<long> Send(byte[] buffer, long offset, long count, bool isEndOfMessage) {
 				await this.networkStream.WriteAsync(buffer, (int)offset, (int)count);
 
 				return count;
 			}
 
-			protected override async Task<long> Receive(byte[] buffer, long offset, long count) {
+			protected override async Task<long> Receive(byte[] buffer, long offset, long count, bool isEndOfMessage) {
 				return await this.networkStream.ReadAsync(buffer, (int)offset, (int)count);
 			}
 
