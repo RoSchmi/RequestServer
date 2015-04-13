@@ -323,7 +323,7 @@ namespace ArkeIndustries.RequestServer {
 		public int Skip { get; set; }
 
 		[MessageParameter(-3)]
-		[AtLeast(1)]
+		[AtLeast(0)]
 		public int Take { get; set; }
 
 		[MessageParameter(-2)]
@@ -353,8 +353,13 @@ namespace ArkeIndustries.RequestServer {
 				var quote = Expression.Quote(sort);
 				var call = Expression.Call(typeof(Queryable), this.Request.OrderByAscending ? "OrderBy" : "OrderByDescending", new[] { typeof(TEntry), property.Type }, query.Expression, quote);
 
-				this.Response.List = query.Provider.CreateQuery<TEntry>(call).Skip(this.Request.Skip).Take(this.Request.Take).ToList();
-			}
+				var skipped = query.Provider.CreateQuery<TEntry>(call).Skip(this.Request.Skip);
+
+				if (this.Request.Take != 0)
+					skipped = skipped.Take(this.Request.Take);
+
+				this.Response.List = skipped.ToList();
+            }
 			catch (ArgumentException) {
 				this.Response.List = query.ToList();
 			}
@@ -375,7 +380,12 @@ namespace ArkeIndustries.RequestServer {
 			if (this.boundProperties == null)
 				this.boundProperties = MessageHandler.GetPropertiesToBind(typeof(T), this.CreateTree(typeof(TEntry)));
 
-			foreach (var sourceEntry in query.Provider.CreateQuery<T>(call).Skip(this.Request.Skip).Take(this.Request.Take)) {
+			var skipped = query.Provider.CreateQuery<T>(call).Skip(this.Request.Skip);
+
+			if (this.Request.Take != 0)
+				skipped = skipped.Take(this.Request.Take);
+
+			foreach (var sourceEntry in skipped) {
 				var resultEntry = new TEntry();
 
 				foreach (var p in this.boundProperties)
