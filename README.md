@@ -1,3 +1,3 @@
-Game-Server
-===========
+GameServer
+==========
 Coming soon.
