@@ -1,3 +1,3 @@
-GameServer
-==========
+C++ Request Server
+==================
 Coming soon.
