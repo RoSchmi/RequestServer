@@ -1,3 +1,3 @@
-C++ Request Server
-==================
+Request Server
+==============
 Coming soon.
