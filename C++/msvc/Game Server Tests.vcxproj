@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+
+<Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+	<Import Project="$(CONFIG_PATH)\MSBuild\VC Test.props" />
+	<ItemGroup>
+		<ClCompile Include="..\tests\Main.cpp" />
+	</ItemGroup>
+	<PropertyGroup Label="Globals">
+		<ProjectGuid>{8EAC06A5-C390-42EB-A2AF-BF070237E1D1}</ProjectGuid>
+	</PropertyGroup>
+	<ItemDefinitionGroup>
+		<Link>
+			<AdditionalDependencies>libpq.lib;Ws2_32.lib;Game Server.lib;Utilities.lib;%(AdditionalDependencies)</AdditionalDependencies>
+		</Link>
+	</ItemDefinitionGroup>
+</Project>
