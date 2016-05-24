@@ -1,71 +1,46 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
-  <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{6BBD8634-10F0-4FA1-BA79-2D7A9AEB3EC7}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>ArkeIndustries.RequestServer</RootNamespace>
-    <AssemblyName>ArkeIndustries.RequestServer</AssemblyName>
-    <TargetFrameworkVersion>v4.6</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
-    <TargetFrameworkProfile />
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <CodeAnalysisRuleSet>Request Server.ruleset</CodeAnalysisRuleSet>
-    <RunCodeAnalysis>true</RunCodeAnalysis>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <RunCodeAnalysis>true</RunCodeAnalysis>
-    <CodeAnalysisRuleSet>Request Server.ruleset</CodeAnalysisRuleSet>
-  </PropertyGroup>
-  <ItemGroup>
-    <Reference Include="System" />
-    <Reference Include="System.ComponentModel.DataAnnotations" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="Codes.cs" />
-    <Compile Include="Connection.cs" />
-    <Compile Include="DataAnnotations.cs" />
-    <Compile Include="Exceptions.cs" />
-    <Compile Include="MessageContext.cs" />
-    <Compile Include="MessageHandler.cs" />
-    <Compile Include="Message.cs" />
-    <Compile Include="Node.cs" />
-    <Compile Include="MessageSource.cs" />
-    <Compile Include="AssemblyInfo.cs" />
-    <Compile Include="Notification.cs" />
-    <Compile Include="Updater.cs" />
-    <Compile Include="WebSocketSource.cs" />
-    <Compile Include="TcpSource.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <CodeAnalysisDictionary Include="CustomDictionary.xml" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Request Server.ruleset" />
-  </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
+
+<Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+	<Import Project="$(CONFIG_PATH)\MSBuild\CS Library.props" />
+	
+	<PropertyGroup>
+		<ProjectGuid>{6BBD8634-10F0-4FA1-BA79-2D7A9AEB3EC7}</ProjectGuid>
+		<RootNamespace>ArkeIndustries.RequestServer</RootNamespace>
+		<AssemblyName>ArkeIndustries.RequestServer</AssemblyName>
+	</PropertyGroup>
+	
+	<PropertyGroup>
+		<RunCodeAnalysis>true</RunCodeAnalysis>
+		<CodeAnalysisRuleSet>Rules.ruleset</CodeAnalysisRuleSet>
+	</PropertyGroup>
+	
+	<ItemGroup>
+		<Reference Include="System" />
+		<Reference Include="System.ComponentModel.DataAnnotations" />
+	</ItemGroup>
+	
+	<ItemGroup>
+		<Compile Include="Codes.cs" />
+		<Compile Include="Connection.cs" />
+		<Compile Include="DataAnnotations.cs" />
+		<Compile Include="Exceptions.cs" />
+		<Compile Include="MessageContext.cs" />
+		<Compile Include="MessageHandler.cs" />
+		<Compile Include="Message.cs" />
+		<Compile Include="Node.cs" />
+		<Compile Include="MessageSource.cs" />
+		<Compile Include="AssemblyInfo.cs" />
+		<Compile Include="Notification.cs" />
+		<Compile Include="Updater.cs" />
+		<Compile Include="WebSocketSource.cs" />
+		<Compile Include="TcpSource.cs" />
+	</ItemGroup>
+	
+	<ItemGroup>
+		<CodeAnalysisDictionary Include="CustomDictionary.xml" />
+	</ItemGroup>
+	
+	<ItemGroup>
+		<None Include="Rules.ruleset" />
+	</ItemGroup>
 </Project>
