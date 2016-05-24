@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
 VisualStudioVersion = 12.0.30723.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Game Server", "Game Server.vcxproj", "{8CC8633E-8BE3-4ED9-9E1D-6813516C8039}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ArkeIndustries.CPPRequestServer", "ArkeIndustries.CPPRequestServer.vcxproj", "{8CC8633E-8BE3-4ED9-9E1D-6813516C8039}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Game Server Tests", "Game Server Tests.vcxproj", "{8EAC06A5-C390-42EB-A2AF-BF070237E1D1}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ArkeIndustries.CPPRequestServer.Tests", "ArkeIndustries.CPPRequestServer.Tests.vcxproj", "{8EAC06A5-C390-42EB-A2AF-BF070237E1D1}"
 	ProjectSection(ProjectDependencies) = postProject
 		{8CC8633E-8BE3-4ED9-9E1D-6813516C8039} = {8CC8633E-8BE3-4ED9-9E1D-6813516C8039}
 	EndProjectSection

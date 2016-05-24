@@ -2,7 +2,7 @@
 
 #include <type_traits>
 
-#include <Utilities/SQL/Database.h>
+#include <ArkeIndustries.CPPUtilities/SQL/Database.h>
 
 #include "Common.h"
 
@@ -43,8 +43,8 @@ namespace game_server {
 			obj_id planet_id;
 			coord x;
 			coord y;
-			size width;
-			size height;
+			dimension width;
+			dimension height;
 		};
 	}
 }

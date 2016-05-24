@@ -10,7 +10,7 @@
 #include <thread>
 #include <type_traits>
 
-#include <Utilities/Common.h>
+#include <ArkeIndustries.CPPUtilities/Common.h>
 
 #include "Common.h"
 #include "Objects.h"
@@ -21,9 +21,9 @@ namespace game_server {
 		coord start_y;
 		coord end_x;
 		coord end_y;
-		size width;
-		size height;
-		size los_radius;
+		dimension width;
+		dimension height;
+		dimension los_radius;
 
 		std::thread::id lock_holder;
 		std::recursive_mutex mtx;
@@ -51,31 +51,31 @@ namespace game_server {
 			cache_provider& operator=(cache_provider&& other) = delete;
 			cache_provider& operator=(const cache_provider& other) = delete;
 
-			cache_provider(coord start_x, coord start_y, size width, size height, size los_radius);
+			cache_provider(coord start_x, coord start_y, dimension width, dimension height, dimension los_radius);
 			cache_provider() = default;
 			virtual ~cache_provider();
 
-			void set_bounds(coord start_x, coord start_y, size width, size height, size los_radius);
+			void set_bounds(coord start_x, coord start_y, dimension width, dimension height, dimension los_radius);
 
 			void lock();
 			void unlock();
-			void begin_update(coord x = 0, coord y = 0, size width = 0, size height = 0);
+			void begin_update(coord x = 0, coord y = 0, dimension width = 0, dimension height = 0);
 			void end_update();
 
 			void clamp(coord& start_x, coord& start_y, coord& end_x, coord& end_y);
 
 			std::unique_ptr<objects::base_obj> get_by_id(obj_id search_id);
 			std::unique_ptr<objects::map_obj> get_at_location(coord x, coord y);
-			std::unordered_map<obj_id, std::unique_ptr<objects::map_obj>> get_in_area(coord x, coord y, size width = 1, size height = 1);
+			std::unordered_map<obj_id, std::unique_ptr<objects::map_obj>> get_in_area(coord x, coord y, dimension width = 1, dimension height = 1);
 			std::unordered_set<obj_id> get_users_with_los_at(coord x, coord y);
 
 			std::unordered_map<obj_id, std::unique_ptr<objects::base_obj>> get_by_owner(owner_id owner);
 			std::unordered_map<obj_id, std::unique_ptr<objects::map_obj>> get_in_owner_los(owner_id owner);
-			std::unordered_map<obj_id, std::unique_ptr<objects::map_obj>> get_in_owner_los(owner_id owner, coord x, coord y, size width, size height);
+			std::unordered_map<obj_id, std::unique_ptr<objects::map_obj>> get_in_owner_los(owner_id owner, coord x, coord y, dimension width, dimension height);
 
-			bool is_area_empty(coord x, coord y, size width = 1, size height = 1);
+			bool is_area_empty(coord x, coord y, dimension width = 1, dimension height = 1);
 			bool is_location_in_los(coord x, coord y, owner_id owner);
-			bool is_location_in_bounds(coord x, coord y, size width = 1, size height = 1);
+			bool is_location_in_bounds(coord x, coord y, dimension width = 1, dimension height = 1);
 			bool is_user_present(obj_id user_id);
 
 			template<typename T> T get_by_id(obj_id search_id) {

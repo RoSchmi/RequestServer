@@ -1,14 +1,14 @@
 #pragma once
 
-#include <Utilities/Common.h>
-#include <Utilities/DataStream.h>
+#include <ArkeIndustries.CPPUtilities/Common.h>
+#include <ArkeIndustries.CPPUtilities/DataStream.h>
 
 namespace game_server {
 	typedef uint16 result_code;
 	typedef uint64 owner_id;
 	typedef uint64 obj_id;
 	typedef uint64 coord;
-	typedef uint32 size;
+	typedef uint32 dimension;
 	typedef uint16 obj_type;
 
 	class result_codes {

@@ -2,8 +2,8 @@
 
 #include <memory>
 
-#include <Utilities/DataStream.h>
-#include <Utilities/Net/TCPConnection.h>
+#include <ArkeIndustries.CPPUtilities/DataStream.h>
+#include <ArkeIndustries.CPPUtilities/Net/TCPConnection.h>
 
 #include "ProcessorNode.h"
 

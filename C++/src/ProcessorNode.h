@@ -9,11 +9,11 @@
 #include <algorithm>
 #include <type_traits>
 
-#include <Utilities/Common.h>
-#include <Utilities/Optional.h>
-#include <Utilities/SQL/Database.h>
-#include <Utilities/Net/RequestServer.h>
-#include <Utilities/Net/TCPConnection.h>
+#include <ArkeIndustries.CPPUtilities/Common.h>
+#include <ArkeIndustries.CPPUtilities/Optional.h>
+#include <ArkeIndustries.CPPUtilities/SQL/Database.h>
+#include <ArkeIndustries.CPPUtilities/Net/RequestServer.h>
+#include <ArkeIndustries.CPPUtilities/Net/TCPConnection.h>
 
 #include "Common.h"
 

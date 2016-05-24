@@ -9,11 +9,11 @@ using namespace util;
 using namespace game_server;
 using namespace game_server::objects;
 
-cache_provider::cache_provider(coord start_x, coord start_y, size width, size height, size los_radius) {
+cache_provider::cache_provider(coord start_x, coord start_y, dimension width, dimension height, dimension los_radius) {
 	this->set_bounds(start_x, start_y, width, height, los_radius);
 }
 
-void cache_provider::set_bounds(coord start_x, coord start_y, size width, size height, size los_radius) {
+void cache_provider::set_bounds(coord start_x, coord start_y, dimension width, dimension height, dimension los_radius) {
 	this->start_x = start_x;
 	this->start_y = start_y;
 	this->end_x = start_x + width;
@@ -38,7 +38,7 @@ void cache_provider::unlock() {
 	this->mtx.unlock();
 }
 
-void cache_provider::begin_update(coord x, coord y, size width, size height) {
+void cache_provider::begin_update(coord x, coord y, dimension width, dimension height) {
 	this->lock();
 }
 
@@ -134,7 +134,7 @@ unique_ptr<map_obj> cache_provider::get_at_location(coord x, coord y) {
 		return unique_ptr<map_obj>();
 }
 
-unordered_map<obj_id, unique_ptr<map_obj>> cache_provider::get_in_area(coord x, coord y, size width, size height) {
+unordered_map<obj_id, unique_ptr<map_obj>> cache_provider::get_in_area(coord x, coord y, dimension width, dimension height) {
 	unordered_map<obj_id, unique_ptr<map_obj>> result;
 	coord end_x = x + width;
 	coord end_y = y + height;
@@ -197,7 +197,7 @@ unordered_map<obj_id, unique_ptr<map_obj>> cache_provider::get_in_owner_los(owne
 	return result;
 }
 
-unordered_map<obj_id, unique_ptr<map_obj>> cache_provider::get_in_owner_los(owner_id owner, coord x, coord y, size width, size height) {
+unordered_map<obj_id, unique_ptr<map_obj>> cache_provider::get_in_owner_los(owner_id owner, coord x, coord y, dimension width, dimension height) {
 	unordered_map<obj_id, unique_ptr<map_obj>> result;
 
 	for (auto& current_object : this->get_in_owner_los(owner))
@@ -228,7 +228,7 @@ unordered_set<obj_id> cache_provider::get_users_with_los_at(coord x, coord y) {
 	return result;
 }
 
-bool cache_provider::is_area_empty(coord x, coord y, size width, size height) {
+bool cache_provider::is_area_empty(coord x, coord y, dimension width, dimension height) {
 	coord end_x = x + width;
 	coord end_y = y + height;
 
@@ -264,7 +264,7 @@ bool cache_provider::is_location_in_los(coord x, coord y, owner_id owner) {
 	return false;
 }
 
-bool cache_provider::is_location_in_bounds(coord x, coord y, size width, size height) {
+bool cache_provider::is_location_in_bounds(coord x, coord y, dimension width, dimension height) {
 	return x >= this->start_x && y >= this->start_y && x + width <= this->end_x && y + height <= this->end_y;
 }
 
