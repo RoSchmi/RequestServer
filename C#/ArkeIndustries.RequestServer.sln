@@ -1,9 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.22609.0
+# Visual Studio 15
+VisualStudioVersion = 15.0.26430.6
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ArkeIndustries.RequestServer", "ArkeIndustries.RequestServer.csproj", "{6BBD8634-10F0-4FA1-BA79-2D7A9AEB3EC7}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ArkeIndustries.RequestServer", "ArkeIndustries.RequestServer.csproj", "{CC6BD0FD-4E28-423D-9A84-113FC4E904AD}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -11,10 +11,10 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{6BBD8634-10F0-4FA1-BA79-2D7A9AEB3EC7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{6BBD8634-10F0-4FA1-BA79-2D7A9AEB3EC7}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{6BBD8634-10F0-4FA1-BA79-2D7A9AEB3EC7}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{6BBD8634-10F0-4FA1-BA79-2D7A9AEB3EC7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CC6BD0FD-4E28-423D-9A84-113FC4E904AD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CC6BD0FD-4E28-423D-9A84-113FC4E904AD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CC6BD0FD-4E28-423D-9A84-113FC4E904AD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CC6BD0FD-4E28-423D-9A84-113FC4E904AD}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

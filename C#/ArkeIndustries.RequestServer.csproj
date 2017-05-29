@@ -1,46 +1,9 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard1.6</TargetFramework>
+  </PropertyGroup>
 
-<Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-	<Import Project="$(CONFIG_PATH)\MSBuild\CS Library.props" />
-	
-	<PropertyGroup>
-		<ProjectGuid>{6BBD8634-10F0-4FA1-BA79-2D7A9AEB3EC7}</ProjectGuid>
-		<RootNamespace>ArkeIndustries.RequestServer</RootNamespace>
-		<AssemblyName>ArkeIndustries.RequestServer</AssemblyName>
-	</PropertyGroup>
-	
-	<PropertyGroup>
-		<RunCodeAnalysis>true</RunCodeAnalysis>
-		<CodeAnalysisRuleSet>Rules.ruleset</CodeAnalysisRuleSet>
-	</PropertyGroup>
-	
-	<ItemGroup>
-		<Reference Include="System" />
-		<Reference Include="System.ComponentModel.DataAnnotations" />
-	</ItemGroup>
-	
-	<ItemGroup>
-		<Compile Include="Codes.cs" />
-		<Compile Include="Connection.cs" />
-		<Compile Include="DataAnnotations.cs" />
-		<Compile Include="Exceptions.cs" />
-		<Compile Include="MessageContext.cs" />
-		<Compile Include="MessageHandler.cs" />
-		<Compile Include="Message.cs" />
-		<Compile Include="Node.cs" />
-		<Compile Include="MessageSource.cs" />
-		<Compile Include="AssemblyInfo.cs" />
-		<Compile Include="Notification.cs" />
-		<Compile Include="Updater.cs" />
-		<Compile Include="WebSocketSource.cs" />
-		<Compile Include="TcpSource.cs" />
-	</ItemGroup>
-	
-	<ItemGroup>
-		<CodeAnalysisDictionary Include="CustomDictionary.xml" />
-	</ItemGroup>
-	
-	<ItemGroup>
-		<None Include="Rules.ruleset" />
-	</ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Net.WebSockets" Version="4.3.0" />
+  </ItemGroup>
 </Project>
